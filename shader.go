@@ -72,14 +72,16 @@ uniform mat4 ProjectionMatrix;
 uniform mat4 CameraMatrix;
 uniform mat4 ModelMatrix;
 
-in vec3 vert;
-in vec2 vertTexCoord;
+in vec3 VertexPosition;
+in vec2 VertexUV;
 
-out vec2 fragTexCoord;
+// in mat4 ModelMatrix;
+
+out vec2 FragmentUV;
 
 void main() {
-    fragTexCoord = vertTexCoord;
-    gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(vert, 1);
+    FragmentUV = VertexUV;
+    gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(VertexPosition, 1);
 }
 ` + "\x00"
 
@@ -88,11 +90,11 @@ var fragmentShader = `
 
 uniform sampler2D AlbedoTexture;
 
-in vec2 fragTexCoord;
+in vec2 FragmentUV;
 
-out vec4 outputColor;
+out vec4 OutputColor;
 
 void main() {
-    outputColor = texture(AlbedoTexture, fragTexCoord);
+    OutputColor = texture(AlbedoTexture, FragmentUV);
 }
 ` + "\x00"

@@ -67,7 +67,7 @@ func main() {
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 	gl.Uniform1i(textureUniform, 0)
 
-	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
+	gl.BindFragDataLocation(program, 0, gl.Str("OutputColor\x00"))
 
 	texture, err := LoadTexture("square.png")
 	if err != nil {
@@ -84,13 +84,40 @@ func main() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
 
-	vertAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
-	gl.EnableVertexAttribArray(vertAttrib)
-	gl.VertexAttribPointer(vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
+	vertexPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
+	gl.EnableVertexAttribArray(vertexPositionAttrib)
+	gl.VertexAttribPointer(vertexPositionAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
 
-	texCoordAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
-	gl.EnableVertexAttribArray(texCoordAttrib)
-	gl.VertexAttribPointer(texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+	vertexUVAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexUV\x00")))
+	gl.EnableVertexAttribArray(vertexUVAttrib)
+	gl.VertexAttribPointer(vertexUVAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+
+	var ibo uint32
+	gl.GenBuffers(1, &ibo)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(cubeIndices), gl.Ptr(cubeIndices), gl.STATIC_DRAW)
+
+	var models [16]m.Mat4
+	for i := range models {
+		models[i] = m.Ident4()
+	}
+	/*
+		var offsetBuffer uint32
+		gl.GenBuffers(1, &offsetBuffer)
+		gl.BindBuffer(gl.ARRAY_BUFFER, offsetBuffer)
+		gl.BufferData(gl.ARRAY_BUFFER, len(models)*16*4, gl.Ptr(models), gl.DYNAMIC_DRAW)
+
+		modelMatrixAttrib := uint32(gl.GetAttribLocation(program, gl.Str("ModelMatrix\x00")))
+		gl.EnableVertexAttribArray(modelMatrixAttrib)
+		gl.VertexAttribPointer(modelMatrixAttrib, 16, gl.FLOAT, false, 16*4, gl.PtrOffset(0))
+
+		for i := range models {
+			models[i] = m.Ident4()
+		}
+		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+		gl.Uniform1i(textureUniform, 0)
+		modelUniform := gl.GetUniformLocation(program, gl.Str("ModelMatrix\x00"))
+	*/
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -105,18 +132,26 @@ func main() {
 		// Update
 		angle += world.DeltaTime
 		model = m.HomogRotate3D(angle, m.Vec3{0, 1, 0})
+		/*
+			for i := range models {
+				models[i] = m.HomogRotate3D(angle*float32(i)*2.14, m.Vec3{0, 1, 0})
+			}
+			gl.BufferSubData(offsetBuffer, 0, 16*4, gl.Ptr(models))
+		*/
 
 		// Render
 		gl.UseProgram(program)
 		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
 		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+
 		gl.BindVertexArray(vao)
 
 		gl.ActiveTexture(gl.TEXTURE0)
 		gl.BindTexture(gl.TEXTURE_2D, texture.ID)
 
-		gl.DrawArrays(gl.TRIANGLES, 0, 6*2*3)
+		gl.DrawElements(gl.TRIANGLES, int32(len(cubeIndices)), gl.UNSIGNED_BYTE, gl.Ptr(nil))
+		// gl.DrawElements(gl.TRIANGLES, 0, 6*2*3)
 
 		// Maintenance
 		window.SwapBuffers()
