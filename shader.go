@@ -79,7 +79,7 @@ in mat4 ModelMatrix;
 out vec2 FragmentUV;
 
 void main() {
-    FragmentUV = VertexUV;
+	FragmentUV = VertexUV;
     gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(VertexPosition, 1);
 }
 ` + "\x00"

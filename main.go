@@ -73,47 +73,49 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// Configure the vertex data
-	var vao uint32
-	gl.GenVertexArrays(1, &vao)
-	gl.BindVertexArray(vao)
+	// setup instance data
+	var meshVAO uint32
+	gl.GenVertexArrays(1, &meshVAO)
+	gl.BindVertexArray(meshVAO)
 
-	var vbo uint32
-	gl.GenBuffers(1, &vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	var meshVBO uint32
+	gl.GenBuffers(1, &meshVBO)
+	gl.BindBuffer(gl.ARRAY_BUFFER, meshVBO)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
 
-	vertexPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
-	gl.VertexAttribPointer(vertexPositionAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
-	gl.EnableVertexAttribArray(vertexPositionAttrib)
+	meshPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
+	gl.EnableVertexAttribArray(meshPositionAttrib)
+	gl.VertexAttribPointer(meshPositionAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
 
-	vertexUVAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexUV\x00")))
-	gl.VertexAttribPointer(vertexUVAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
-	gl.EnableVertexAttribArray(vertexUVAttrib)
+	meshUVAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexUV\x00")))
+	gl.EnableVertexAttribArray(meshUVAttrib)
+	gl.VertexAttribPointer(meshUVAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
 
-	var ibo uint32
-	gl.GenBuffers(1, &ibo)
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo)
+	var meshIBO uint32
+	gl.GenBuffers(1, &meshIBO)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshIBO)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(cubeIndices), gl.Ptr(cubeIndices), gl.STATIC_DRAW)
 
-	var models [16]m.Mat4
-	for i := range models {
-		// models[i] = m.Ident4()
-		models[i] = m.Translate3D(float32(i), float32(i), float32(i))
+	var models []m.Mat4
+	for x := -4; x <= 4; x++ {
+		for z := -4; z <= 4; z++ {
+			models = append(models,
+				m.Translate3D(float32(x), 0, float32(z)).
+					Mul4(m.Scale3D(0.25, 0.25, 0.25)))
+		}
 	}
 
-	modelMatrixAttrib := uint32(gl.GetAttribLocation(program, gl.Str("ModelMatrix\x00")))
-
-	var modelMatrixBuffer uint32
-	gl.GenBuffers(1, &modelMatrixBuffer)
-	gl.BindBuffer(gl.ARRAY_BUFFER, modelMatrixBuffer)
+	var instanceVBO uint32
+	gl.GenBuffers(1, &instanceVBO)
+	gl.BindBuffer(gl.ARRAY_BUFFER, instanceVBO)
 	gl.BufferData(gl.ARRAY_BUFFER, len(models)*Mat4Size, gl.Ptr(models[:]), gl.DYNAMIC_DRAW)
 
+	instanceMatrixAttrib := uint32(gl.GetAttribLocation(program, gl.Str("ModelMatrix\x00")))
 	for i := 0; i < 4; i++ {
-		attrib := modelMatrixAttrib + uint32(i)
-		gl.VertexAttribPointer(attrib, 4, gl.FLOAT, false, Mat4Size, gl.PtrOffset(i*4))
-		gl.VertexAttribDivisor(attrib, 1)
+		attrib := instanceMatrixAttrib + uint32(i)
 		gl.EnableVertexAttribArray(attrib)
+		gl.VertexAttribPointer(attrib, 4, gl.FLOAT, false, Mat4Size, gl.PtrOffset(i*4*4))
+		gl.VertexAttribDivisor(attrib, 1)
 	}
 
 	// Configure global settings
@@ -125,27 +127,34 @@ func main() {
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		sn, cs := math.Sincos(float64(angle))
-		world.Camera.Eye[0] = float32(sn) * 3.0
-		world.Camera.Eye[2] = float32(cs) * 3.0
+		//sn, cs := math.Sincos(float64(angle))
+		//world.Camera.Eye[0] = float32(sn) * 3.0
+		//world.Camera.Eye[2] = float32(cs) * 3.0
 
 		world.NextFrameGLFW(window)
 
 		// Update
 		angle += world.DeltaTime
-		//for i := range models {
-		//	models[i] = m.HomogRotate3D(angle, m.Vec3{0, 1, 0})
-		//}
+		i := 0
+		for x := -4; x <= 4; x++ {
+			for z := -4; z <= 4; z++ {
+				models[i] = m.Translate3D(float32(x), 0, float32(z)).Mul4(
+					m.Scale3D(0.25, 0.25, 0.25)).Mul4(
+					m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}),
+				)
+				i++
+			}
+		}
 
 		// Render
 		gl.UseProgram(program)
 		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
 
-		gl.BindBuffer(gl.ARRAY_BUFFER, modelMatrixBuffer)
-		// gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(models)*Mat4Size, gl.Ptr(models[:]))
+		gl.BindBuffer(gl.ARRAY_BUFFER, instanceVBO)
+		gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(models)*Mat4Size, gl.Ptr(models[:]))
 
-		gl.BindVertexArray(vao)
+		gl.BindVertexArray(meshVAO)
 
 		gl.ActiveTexture(gl.TEXTURE0)
 		gl.BindTexture(gl.TEXTURE_2D, texture.ID)
@@ -178,8 +187,13 @@ func NewWorld() *World {
 
 func (world *World) NextFrameGLFW(window *glfw.Window) {
 	width, height := window.GetFramebufferSize()
+	screenSize := m.Vec2{float32(width), float32(height)}
 	now := glfw.GetTime()
-	world.NextFrame(m.Vec2{float32(width), float32(height)}, now)
+
+	if world.ScreenSize != screenSize {
+		gl.Viewport(0, 0, int32(width), int32(height))
+	}
+	world.NextFrame(screenSize, now)
 }
 
 func (world *World) NextFrame(screenSize m.Vec2, now float64) {
