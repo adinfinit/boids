@@ -4,6 +4,7 @@ import (
 	"flag"
 	_ "image/png"
 	"log"
+	"math"
 	"runtime"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -22,6 +23,8 @@ type Boids struct {
 	Acceleration [1024]m.Vec4
 	Color        [1024]m.Vec4
 }
+
+const Mat4Size = 16 * 4
 
 func init() { runtime.LockOSThread() }
 
@@ -60,11 +63,7 @@ func main() {
 
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
-	modelUniform := gl.GetUniformLocation(program, gl.Str("ModelMatrix\x00"))
 	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
-
-	model := m.Ident4()
-	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
 	gl.Uniform1i(textureUniform, 0)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("OutputColor\x00"))
@@ -85,12 +84,12 @@ func main() {
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
 
 	vertexPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
-	gl.EnableVertexAttribArray(vertexPositionAttrib)
 	gl.VertexAttribPointer(vertexPositionAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
+	gl.EnableVertexAttribArray(vertexPositionAttrib)
 
 	vertexUVAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexUV\x00")))
-	gl.EnableVertexAttribArray(vertexUVAttrib)
 	gl.VertexAttribPointer(vertexUVAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+	gl.EnableVertexAttribArray(vertexUVAttrib)
 
 	var ibo uint32
 	gl.GenBuffers(1, &ibo)
@@ -99,25 +98,23 @@ func main() {
 
 	var models [16]m.Mat4
 	for i := range models {
-		models[i] = m.Ident4()
+		// models[i] = m.Ident4()
+		models[i] = m.Translate3D(float32(i), float32(i), float32(i))
 	}
-	/*
-		var offsetBuffer uint32
-		gl.GenBuffers(1, &offsetBuffer)
-		gl.BindBuffer(gl.ARRAY_BUFFER, offsetBuffer)
-		gl.BufferData(gl.ARRAY_BUFFER, len(models)*16*4, gl.Ptr(models), gl.DYNAMIC_DRAW)
 
-		modelMatrixAttrib := uint32(gl.GetAttribLocation(program, gl.Str("ModelMatrix\x00")))
-		gl.EnableVertexAttribArray(modelMatrixAttrib)
-		gl.VertexAttribPointer(modelMatrixAttrib, 16, gl.FLOAT, false, 16*4, gl.PtrOffset(0))
+	modelMatrixAttrib := uint32(gl.GetAttribLocation(program, gl.Str("ModelMatrix\x00")))
 
-		for i := range models {
-			models[i] = m.Ident4()
-		}
-		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
-		gl.Uniform1i(textureUniform, 0)
-		modelUniform := gl.GetUniformLocation(program, gl.Str("ModelMatrix\x00"))
-	*/
+	var modelMatrixBuffer uint32
+	gl.GenBuffers(1, &modelMatrixBuffer)
+	gl.BindBuffer(gl.ARRAY_BUFFER, modelMatrixBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(models)*Mat4Size, gl.Ptr(models[:]), gl.DYNAMIC_DRAW)
+
+	for i := 0; i < 4; i++ {
+		attrib := modelMatrixAttrib + uint32(i)
+		gl.VertexAttribPointer(attrib, 4, gl.FLOAT, false, Mat4Size, gl.PtrOffset(i*4))
+		gl.VertexAttribDivisor(attrib, 1)
+		gl.EnableVertexAttribArray(attrib)
+	}
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -127,31 +124,36 @@ func main() {
 	angle := float32(0.0)
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+		sn, cs := math.Sincos(float64(angle))
+		world.Camera.Eye[0] = float32(sn) * 3.0
+		world.Camera.Eye[2] = float32(cs) * 3.0
+
 		world.NextFrameGLFW(window)
 
 		// Update
 		angle += world.DeltaTime
-		model = m.HomogRotate3D(angle, m.Vec3{0, 1, 0})
-		/*
-			for i := range models {
-				models[i] = m.HomogRotate3D(angle*float32(i)*2.14, m.Vec3{0, 1, 0})
-			}
-			gl.BufferSubData(offsetBuffer, 0, 16*4, gl.Ptr(models))
-		*/
+		//for i := range models {
+		//	models[i] = m.HomogRotate3D(angle, m.Vec3{0, 1, 0})
+		//}
 
 		// Render
 		gl.UseProgram(program)
 		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
-		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+
+		gl.BindBuffer(gl.ARRAY_BUFFER, modelMatrixBuffer)
+		// gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(models)*Mat4Size, gl.Ptr(models[:]))
 
 		gl.BindVertexArray(vao)
 
 		gl.ActiveTexture(gl.TEXTURE0)
 		gl.BindTexture(gl.TEXTURE_2D, texture.ID)
 
-		gl.DrawElements(gl.TRIANGLES, int32(len(cubeIndices)), gl.UNSIGNED_BYTE, gl.Ptr(nil))
-		// gl.DrawElements(gl.TRIANGLES, 0, 6*2*3)
+		gl.DrawElementsInstanced(
+			gl.TRIANGLES, int32(len(cubeIndices)), gl.UNSIGNED_BYTE, gl.PtrOffset(0),
+			int32(len(models)),
+		)
 
 		// Maintenance
 		window.SwapBuffers()

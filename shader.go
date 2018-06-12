@@ -70,12 +70,11 @@ var vertexShader = `
 
 uniform mat4 ProjectionMatrix;
 uniform mat4 CameraMatrix;
-uniform mat4 ModelMatrix;
 
 in vec3 VertexPosition;
 in vec2 VertexUV;
 
-// in mat4 ModelMatrix;
+in mat4 ModelMatrix;
 
 out vec2 FragmentUV;
 
