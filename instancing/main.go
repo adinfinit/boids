@@ -1,8 +1,3 @@
-// Copyright 2014 The go-gl Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// Renders a textured spinning cube using GLFW 3 and OpenGL 4.1 core forward-compatible profile.
 package main
 
 import (
@@ -20,10 +15,7 @@ import (
 const windowWidth = 800
 const windowHeight = 600
 
-func init() {
-	// GLFW event handling must run on the main OS thread
-	runtime.LockOSThread()
-}
+func init() { runtime.LockOSThread() }
 
 func main() {
 	if err := glfw.Init(); err != nil {
