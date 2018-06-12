@@ -2,11 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	_ "image/png"
 	"log"
 	"runtime"
-	"strings"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
@@ -17,6 +15,13 @@ var (
 	windowWidth  = flag.Int("width", 800, "window width")
 	windowHeight = flag.Int("height", 600, "window height")
 )
+
+type Boids struct {
+	Position     [1024]m.Vec4
+	Velocity     [1024]m.Vec4
+	Acceleration [1024]m.Vec4
+	Color        [1024]m.Vec4
+}
 
 func init() { runtime.LockOSThread() }
 
@@ -53,19 +58,13 @@ func main() {
 
 	gl.UseProgram(program)
 
-	projection := m.Perspective(m.DegToRad(45.0), float32(*windowWidth)/float32(*windowHeight), 0.1, 10.0)
-	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
-
-	camera := m.LookAtV(m.Vec3{3, 3, 3}, m.Vec3{0, 0, 0}, m.Vec3{0, 1, 0})
-	cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
-	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
+	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
+	modelUniform := gl.GetUniformLocation(program, gl.Str("ModelMatrix\x00"))
+	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
 
 	model := m.Ident4()
-	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
 	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
-
-	textureUniform := gl.GetUniformLocation(program, gl.Str("tex\x00"))
 	gl.Uniform1i(textureUniform, 0)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
@@ -98,25 +97,20 @@ func main() {
 	gl.DepthFunc(gl.LESS)
 	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 
-	angle := 0.0
-	previousTime := glfw.GetTime()
-
+	angle := float32(0.0)
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 		world.NextFrameGLFW(window)
 
 		// Update
-		time := glfw.GetTime()
-		elapsed := time - previousTime
-		previousTime = time
-
-		angle += elapsed
-		model = m.HomogRotate3D(float32(angle), m.Vec3{0, 1, 0})
+		angle += world.DeltaTime
+		model = m.HomogRotate3D(angle, m.Vec3{0, 1, 0})
 
 		// Render
 		gl.UseProgram(program)
+		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
+		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
 		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
-
 		gl.BindVertexArray(vao)
 
 		gl.ActiveTexture(gl.TEXTURE0)
@@ -152,6 +146,9 @@ func (world *World) NextFrameGLFW(window *glfw.Window) {
 }
 
 func (world *World) NextFrame(screenSize m.Vec2, now float64) {
+	if world.ScreenSize != screenSize {
+		log.Println(screenSize, screenSize.X()/screenSize.Y())
+	}
 	world.ScreenSize = screenSize
 	world.DeltaTime = float32(now - world.Time)
 	world.Time = now
@@ -166,7 +163,7 @@ type Camera struct {
 	Near, Far float32
 
 	Projection m.Mat4
-	View       m.Mat4
+	Camera     m.Mat4
 }
 
 func NewCamera() *Camera {
@@ -180,146 +177,5 @@ func NewCamera() *Camera {
 
 func (camera *Camera) UpdateScreenSize(size m.Vec2) {
 	camera.Projection = m.Perspective(m.DegToRad(camera.FOV), size.X()/size.Y(), 0.1, 10.0)
-	camera.View = m.LookAtV(camera.Eye, camera.LookAt, camera.Up)
-}
-
-func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
-	if err != nil {
-		return 0, err
-	}
-
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
-	if err != nil {
-		return 0, err
-	}
-
-	program := gl.CreateProgram()
-
-	gl.AttachShader(program, vertexShader)
-	gl.AttachShader(program, fragmentShader)
-	gl.LinkProgram(program)
-
-	var status int32
-	gl.GetProgramiv(program, gl.LINK_STATUS, &status)
-	if status == gl.FALSE {
-		var logLength int32
-		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLength)
-
-		log := strings.Repeat("\x00", int(logLength+1))
-		gl.GetProgramInfoLog(program, logLength, nil, gl.Str(log))
-
-		return 0, fmt.Errorf("failed to link program: %v", log)
-	}
-
-	gl.DeleteShader(vertexShader)
-	gl.DeleteShader(fragmentShader)
-
-	return program, nil
-}
-
-func compileShader(source string, shaderType uint32) (uint32, error) {
-	shader := gl.CreateShader(shaderType)
-
-	csources, free := gl.Strs(source)
-	gl.ShaderSource(shader, 1, csources, nil)
-	free()
-	gl.CompileShader(shader)
-
-	var status int32
-	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
-	if status == gl.FALSE {
-		var logLength int32
-		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
-
-		log := strings.Repeat("\x00", int(logLength+1))
-		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
-
-		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
-	}
-
-	return shader, nil
-}
-
-var vertexShader = `
-#version 330
-
-uniform mat4 projection;
-uniform mat4 camera;
-uniform mat4 model;
-
-in vec3 vert;
-in vec2 vertTexCoord;
-
-out vec2 fragTexCoord;
-
-void main() {
-    fragTexCoord = vertTexCoord;
-    gl_Position = projection * camera * model * vec4(vert, 1);
-}
-` + "\x00"
-
-var fragmentShader = `
-#version 330
-
-uniform sampler2D tex;
-
-in vec2 fragTexCoord;
-
-out vec4 outputColor;
-
-void main() {
-    outputColor = texture(tex, fragTexCoord);
-}
-` + "\x00"
-
-var cubeVertices = []float32{
-	//  X, Y, Z, U, V
-	// Bottom
-	-1.0, -1.0, -1.0, 0.0, 0.0,
-	1.0, -1.0, -1.0, 1.0, 0.0,
-	-1.0, -1.0, 1.0, 0.0, 1.0,
-	1.0, -1.0, -1.0, 1.0, 0.0,
-	1.0, -1.0, 1.0, 1.0, 1.0,
-	-1.0, -1.0, 1.0, 0.0, 1.0,
-
-	// Top
-	-1.0, 1.0, -1.0, 0.0, 0.0,
-	-1.0, 1.0, 1.0, 0.0, 1.0,
-	1.0, 1.0, -1.0, 1.0, 0.0,
-	1.0, 1.0, -1.0, 1.0, 0.0,
-	-1.0, 1.0, 1.0, 0.0, 1.0,
-	1.0, 1.0, 1.0, 1.0, 1.0,
-
-	// Front
-	-1.0, -1.0, 1.0, 1.0, 0.0,
-	1.0, -1.0, 1.0, 0.0, 0.0,
-	-1.0, 1.0, 1.0, 1.0, 1.0,
-	1.0, -1.0, 1.0, 0.0, 0.0,
-	1.0, 1.0, 1.0, 0.0, 1.0,
-	-1.0, 1.0, 1.0, 1.0, 1.0,
-
-	// Back
-	-1.0, -1.0, -1.0, 0.0, 0.0,
-	-1.0, 1.0, -1.0, 0.0, 1.0,
-	1.0, -1.0, -1.0, 1.0, 0.0,
-	1.0, -1.0, -1.0, 1.0, 0.0,
-	-1.0, 1.0, -1.0, 0.0, 1.0,
-	1.0, 1.0, -1.0, 1.0, 1.0,
-
-	// Left
-	-1.0, -1.0, 1.0, 0.0, 1.0,
-	-1.0, 1.0, -1.0, 1.0, 0.0,
-	-1.0, -1.0, -1.0, 0.0, 0.0,
-	-1.0, -1.0, 1.0, 0.0, 1.0,
-	-1.0, 1.0, 1.0, 1.0, 1.0,
-	-1.0, 1.0, -1.0, 1.0, 0.0,
-
-	// Right
-	1.0, -1.0, 1.0, 1.0, 1.0,
-	1.0, -1.0, -1.0, 1.0, 0.0,
-	1.0, 1.0, -1.0, 0.0, 0.0,
-	1.0, -1.0, 1.0, 1.0, 1.0,
-	1.0, 1.0, -1.0, 0.0, 0.0,
-	1.0, 1.0, 1.0, 0.0, 1.0,
+	camera.Camera = m.LookAtV(camera.Eye, camera.LookAt, camera.Up)
 }
