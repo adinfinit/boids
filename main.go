@@ -68,7 +68,7 @@ func main() {
 
 	gl.BindFragDataLocation(program, 0, gl.Str("OutputColor\x00"))
 
-	texture, err := LoadTexture("square.png")
+	texture, err := LoadTexture("fish.png")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -85,11 +85,15 @@ func main() {
 
 	meshPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
 	gl.EnableVertexAttribArray(meshPositionAttrib)
-	gl.VertexAttribPointer(meshPositionAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
+	gl.VertexAttribPointer(meshPositionAttrib, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(0))
+
+	meshNormalAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexNormal\x00")))
+	gl.EnableVertexAttribArray(meshNormalAttrib)
+	gl.VertexAttribPointer(meshNormalAttrib, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(3*4))
 
 	meshUVAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexUV\x00")))
 	gl.EnableVertexAttribArray(meshUVAttrib)
-	gl.VertexAttribPointer(meshUVAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+	gl.VertexAttribPointer(meshUVAttrib, 2, gl.FLOAT, false, 8*4, gl.PtrOffset(3*4+3*4))
 
 	var meshIBO uint32
 	gl.GenBuffers(1, &meshIBO)
@@ -128,6 +132,8 @@ func main() {
 	gl.CullFace(gl.BACK)
 
 	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
+
+	log.Println("ERROR: ", gl.GetError())
 
 	angle := float32(0.0)
 	for !window.ShouldClose() {

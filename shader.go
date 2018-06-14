@@ -72,14 +72,17 @@ uniform mat4 ProjectionMatrix;
 uniform mat4 CameraMatrix;
 
 in vec3 VertexPosition;
+in vec3 VertexNormal;
 in vec2 VertexUV;
 
 in mat4 ModelMatrix;
 
+out vec3 FragmentNormal;
 out vec2 FragmentUV;
 
 void main() {
 	FragmentUV = VertexUV;
+	FragmentNormal = VertexNormal;
     gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(VertexPosition, 1);
 }
 ` + "\x00"
@@ -89,11 +92,14 @@ var fragmentShader = `
 
 uniform sampler2D AlbedoTexture;
 
+in vec3 FragmentNormal;
 in vec2 FragmentUV;
 
 out vec4 OutputColor;
 
 void main() {
-    OutputColor = texture(AlbedoTexture, FragmentUV);
+	vec2 uv = FragmentUV;
+	uv.x += FragmentNormal.x * 0.001f;
+    OutputColor = texture(AlbedoTexture, uv);
 }
 ` + "\x00"
