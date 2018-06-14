@@ -140,14 +140,15 @@ func main() {
 		world.NextFrameGLFW(window)
 
 		// Update
-		angle += world.DeltaTime
+		angle += world.DeltaTime * 0.1
 		i := 0
 		for x := -N; x <= N; x++ {
 			for z := -N; z <= N; z++ {
-				models[i] = m.Translate3D(float32(x), 0, float32(z)).Mul4(
-					m.Scale3D(0.25, 0.25, 0.25)).Mul4(
-					m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}),
-				)
+				//sn := float32(math.Sin(float64(z) + float64(angle)))
+				_, sn := math.Modf(float64(angle))
+				models[i] = m.Translate3D(float32(x), 0, float32(z)+float32(-sn)*4).Mul4(
+					m.Scale3D(0.25, 0.25, 0.25)).
+					Mul4(m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}))
 				i++
 			}
 		}
@@ -225,7 +226,7 @@ type Camera struct {
 
 func NewCamera() *Camera {
 	return &Camera{
-		Eye:    m.Vec3{30, 30, 30},
+		Eye:    m.Vec3{3, 3, 3},
 		LookAt: m.Vec3{0, 0, 0},
 		Up:     m.Vec3{0, 1, 0},
 		FOV:    45,
