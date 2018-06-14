@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 
 	m "github.com/go-gl/mathgl/mgl32"
@@ -20,8 +19,8 @@ func (mesh *MeshData) Vertex(v m.Vec3) int16 {
 	mesh.Vertices = append(mesh.Vertices, n[:]...)
 	// add cylindrical UV
 	theta := float32(math.Atan2(float64(v.Y()), float64(v.X())))
+
 	pt := theta*0.5/math.Pi + 0.5
-	fmt.Println(pt)
 	mesh.Vertices = append(mesh.Vertices, v.Z()/3+0.4, pt)
 	return int16(p)
 }

@@ -64,6 +64,10 @@ func main() {
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
 	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
+	ambientLightDirectionUniform := gl.GetUniformLocation(program, gl.Str("AmbientLightDirection\x00"))
+
+	ambientLightLocation := m.Vec3{3, 3, 3}
+	gl.Uniform3f(ambientLightDirectionUniform, ambientLightLocation[0], ambientLightLocation[1], ambientLightLocation[2])
 	gl.Uniform1i(textureUniform, 0)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("OutputColor\x00"))
