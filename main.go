@@ -96,9 +96,11 @@ func main() {
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshIBO)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 2*len(cube.Indices), gl.Ptr(cube.Indices), gl.STATIC_DRAW)
 
+	const N = 40
+
 	var models []m.Mat4
-	for x := -4; x <= 4; x++ {
-		for z := -4; z <= 4; z++ {
+	for x := -N; x <= N; x++ {
+		for z := -N; z <= N; z++ {
 			models = append(models,
 				m.Translate3D(float32(x), 0, float32(z)).
 					Mul4(m.Scale3D(0.25, 0.25, 0.25)))
@@ -140,8 +142,8 @@ func main() {
 		// Update
 		angle += world.DeltaTime
 		i := 0
-		for x := -4; x <= 4; x++ {
-			for z := -4; z <= 4; z++ {
+		for x := -N; x <= N; x++ {
+			for z := -N; z <= N; z++ {
 				models[i] = m.Translate3D(float32(x), 0, float32(z)).Mul4(
 					m.Scale3D(0.25, 0.25, 0.25)).Mul4(
 					m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}),
@@ -223,7 +225,7 @@ type Camera struct {
 
 func NewCamera() *Camera {
 	return &Camera{
-		Eye:    m.Vec3{3, 3, 3},
+		Eye:    m.Vec3{30, 30, 30},
 		LookAt: m.Vec3{0, 0, 0},
 		Up:     m.Vec3{0, 1, 0},
 		FOV:    45,
@@ -231,6 +233,6 @@ func NewCamera() *Camera {
 }
 
 func (camera *Camera) UpdateScreenSize(size m.Vec2) {
-	camera.Projection = m.Perspective(m.DegToRad(camera.FOV), size.X()/size.Y(), 0.1, 10.0)
+	camera.Projection = m.Perspective(m.DegToRad(camera.FOV), size.X()/size.Y(), 0.1, 100.0)
 	camera.Camera = m.LookAtV(camera.Eye, camera.LookAt, camera.Up)
 }
