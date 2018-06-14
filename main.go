@@ -121,6 +121,10 @@ func main() {
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
+
+	gl.Enable(gl.CULL_FACE)
+	gl.CullFace(gl.BACK)
+
 	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 
 	angle := float32(0.0)
