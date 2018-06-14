@@ -29,3 +29,5 @@ _testmain.go
 *.framework
 *.aar
 *.apk
+
+boids
