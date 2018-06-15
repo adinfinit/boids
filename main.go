@@ -85,19 +85,19 @@ func main() {
 	var meshVBO uint32
 	gl.GenBuffers(1, &meshVBO)
 	gl.BindBuffer(gl.ARRAY_BUFFER, meshVBO)
-	gl.BufferData(gl.ARRAY_BUFFER, len(cube.Vertices)*4, gl.Ptr(cube.Vertices), gl.STATIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, len(cube.Vertices)*int(MeshVertexBytes), gl.Ptr(cube.Vertices), gl.STATIC_DRAW)
 
 	meshPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
 	gl.EnableVertexAttribArray(meshPositionAttrib)
-	gl.VertexAttribPointer(meshPositionAttrib, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(0))
+	gl.VertexAttribPointer(meshPositionAttrib, 3, gl.FLOAT, false, MeshVertexBytes, gl.PtrOffset(0))
 
 	meshNormalAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexNormal\x00")))
 	gl.EnableVertexAttribArray(meshNormalAttrib)
-	gl.VertexAttribPointer(meshNormalAttrib, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(3*4))
+	gl.VertexAttribPointer(meshNormalAttrib, 3, gl.FLOAT, false, MeshVertexBytes, gl.PtrOffset(3*4))
 
 	meshUVAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexUV\x00")))
 	gl.EnableVertexAttribArray(meshUVAttrib)
-	gl.VertexAttribPointer(meshUVAttrib, 2, gl.FLOAT, false, 8*4, gl.PtrOffset(3*4+3*4))
+	gl.VertexAttribPointer(meshUVAttrib, 2, gl.FLOAT, false, MeshVertexBytes, gl.PtrOffset(3*4+3*4))
 
 	var meshIBO uint32
 	gl.GenBuffers(1, &meshIBO)

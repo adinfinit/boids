@@ -2,31 +2,14 @@ package main
 
 import (
 	"math"
+	"unsafe"
 
 	m "github.com/go-gl/mathgl/mgl32"
 )
 
-type MeshData struct {
-	Vertices []float32
-	Indices  []int16
-}
-
-func (mesh *MeshData) Vertex(v m.Vec3) int16 {
-	p := len(mesh.Vertices) / 8
-	mesh.Vertices = append(mesh.Vertices, v[:]...)
-	// add some normal
-	n := (m.Vec3{v[0], v[1], 0}).Normalize()
-	mesh.Vertices = append(mesh.Vertices, n[:]...)
-	// add cylindrical UV
-	theta := float32(math.Atan2(float64(v.Y()), float64(v.X())))
-
-	pt := theta*0.5/math.Pi + 0.5
-	mesh.Vertices = append(mesh.Vertices, v.Z()/3+0.4, pt)
-	return int16(p)
-}
-
-func (mesh *MeshData) Triangle(a, b, c int16) {
-	mesh.Indices = append(mesh.Indices, a, b, c)
+func impulse(k, x float32) float32 {
+	h := k * x
+	return h * float32(math.Exp(float64(1-h)))
 }
 
 var cube = Lathe(12, 12, true, func(t, phase float32) m.Vec3 {
@@ -44,9 +27,62 @@ var cube = Lathe(12, 12, true, func(t, phase float32) m.Vec3 {
 	}
 })
 
-func impulse(k, x float32) float32 {
-	h := k * x
-	return h * float32(math.Exp(float64(1-h)))
+type MeshData struct {
+	Vertices []MeshVertex
+	Indices  []int16
+}
+
+type MeshVertex struct {
+	Position m.Vec3
+	Normal   m.Vec3
+	UV       m.Vec2
+}
+
+const MeshVertexBytes = int32(unsafe.Sizeof(MeshVertex{}))
+
+func (mesh *MeshData) Vertex(v m.Vec3) int16 {
+	p := len(mesh.Vertices)
+	n := (m.Vec3{v[0], v[1], 0}).Normalize()
+
+	theta := float32(math.Atan2(float64(v.Y()), float64(v.X())))
+	pt := theta*0.5/math.Pi + 0.5
+	uv := m.Vec2{v.Z()/3 + 0.4, pt}
+
+	mesh.Vertices = append(mesh.Vertices, MeshVertex{
+		Position: v,
+		Normal:   n,
+		UV:       uv,
+	})
+
+	return int16(p)
+}
+
+func (mesh *MeshData) RecalculateNormals() {
+	triangleNormals := make([]m.Vec3, len(mesh.Indices)/3)
+	for i := range triangleNormals {
+		ai, bi, ci := mesh.Indices[i*3+0], mesh.Indices[i*3+1], mesh.Indices[i*3+2]
+		a, b, c := mesh.Vertices[ai].Position, mesh.Vertices[bi].Position, mesh.Vertices[ci].Position
+		e1, e2 := b.Sub(a), c.Sub(a)
+		triangleNormals[i] = e1.Cross(e2).Normalize()
+	}
+	triangleCount := make([]int, len(mesh.Vertices))
+	for i := range mesh.Vertices {
+		mesh.Vertices[i].Normal = m.Vec3{}
+	}
+	for i, mi := range mesh.Indices {
+		trin := triangleNormals[i/3]
+		v := &mesh.Vertices[mi]
+		v.Normal = v.Normal.Add(trin)
+		triangleCount[mi]++
+	}
+	for i := range mesh.Vertices {
+		v := &mesh.Vertices[i]
+		v.Normal.Mul(1 / float32(triangleCount[i]))
+	}
+}
+
+func (mesh *MeshData) Triangle(a, b, c int16) {
+	mesh.Indices = append(mesh.Indices, a, b, c)
 }
 
 func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) MeshData {
@@ -102,6 +138,8 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 			mesh.Triangle(a, zt, b)
 		}
 	}
+
+	mesh.RecalculateNormals()
 
 	return mesh
 }
