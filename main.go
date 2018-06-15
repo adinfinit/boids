@@ -64,10 +64,10 @@ func main() {
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
 	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
-	ambientLightDirectionUniform := gl.GetUniformLocation(program, gl.Str("AmbientLightDirection\x00"))
+	diffuseLightPositionUniform := gl.GetUniformLocation(program, gl.Str("DiffuseLightPosition\x00"))
 
-	ambientLightLocation := m.Vec3{3, 3, 3}
-	gl.Uniform3f(ambientLightDirectionUniform, ambientLightLocation[0], ambientLightLocation[1], ambientLightLocation[2])
+	diffuseLightLocation := m.Vec3{3, 3, 3}
+	gl.Uniform3f(diffuseLightPositionUniform, diffuseLightLocation[0], diffuseLightLocation[1], diffuseLightLocation[2])
 	gl.Uniform1i(textureUniform, 0)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("OutputColor\x00"))
@@ -143,20 +143,19 @@ func main() {
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		//sn, cs := math.Sincos(float64(angle))
-		//world.Camera.Eye[0] = float32(sn) * 3.0
-		//world.Camera.Eye[2] = float32(cs) * 3.0
+		// sn, cs := math.Sincos(float64(angle))
+		// world.Camera.Eye[0] = float32(sn) * 3.0
+		// world.Camera.Eye[2] = float32(cs) * 3.0
 
 		world.NextFrameGLFW(window)
 
 		// Update
-		angle += world.DeltaTime * 0.1
+		angle += world.DeltaTime
 		i := 0
 		for x := -N; x <= N; x++ {
 			for z := -N; z <= N; z++ {
 				//sn := float32(math.Sin(float64(z) + float64(angle)))
-				_, sn := math.Modf(float64(angle))
-				models[i] = m.Translate3D(float32(x), 0, float32(z)+float32(-sn)*4).Mul4(
+				models[i] = m.Translate3D(float32(x), 0, float32(z)).Mul4(
 					m.Scale3D(0.25, 0.25, 0.25)).
 					Mul4(m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}))
 				i++
