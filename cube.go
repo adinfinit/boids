@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"math/rand"
 	"unsafe"
 
 	m "github.com/go-gl/mathgl/mgl32"
@@ -56,15 +57,10 @@ const MeshVertexBytes = int32(unsafe.Sizeof(MeshVertex{}))
 func (mesh *MeshData) Vertex(v m.Vec3) int16 {
 	p := len(mesh.Vertices)
 	n := (m.Vec3{v[0], v[1], 0}).Normalize()
-
-	theta := float32(math.Atan2(float64(v.Y()), float64(v.X())))
-	pt := theta*0.5/math.Pi + 0.5
-	uv := m.Vec2{v.Z()/3 + 0.4, pt}
-
 	mesh.Vertices = append(mesh.Vertices, MeshVertex{
 		Position: v,
 		Normal:   n,
-		UV:       uv,
+		UV:       m.Vec2{rand.Float32(), rand.Float32()},
 	})
 
 	return int16(p)
@@ -91,6 +87,30 @@ func (mesh *MeshData) RecalculateNormals() {
 	for i := range mesh.Vertices {
 		v := &mesh.Vertices[i]
 		v.Normal.Mul(1 / float32(triangleCount[i]))
+	}
+}
+
+func (mesh *MeshData) WrapCylinder() {
+	z0 := mesh.Vertices[0].Position.Z()
+	zmin, zmax := z0, z0
+
+	for i := range mesh.Vertices {
+		z := mesh.Vertices[i].Position.Z()
+		if z < zmin {
+			zmin = z
+		}
+		if z > zmax {
+			zmax = z
+		}
+	}
+
+	for i := range mesh.Vertices {
+		v := &mesh.Vertices[i]
+		p := v.Position
+		x, y := float64(p.X()), float64(p.Y())
+		u := (p.Z() - zmin) / (zmax - zmin)
+		theta := math.Atan2(y, x)/(2*math.Pi) + 0.5
+		v.UV = m.Vec2{u, float32(theta)}
 	}
 }
 
@@ -153,6 +173,7 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 	}
 
 	mesh.RecalculateNormals()
+	mesh.WrapCylinder()
 
 	return mesh
 }
