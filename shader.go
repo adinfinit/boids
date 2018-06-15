@@ -85,8 +85,9 @@ out vec2 FragmentUV;
 
 void main() {
 	vec3 position = VertexPosition;
-	position.x += sin(Time * 5 - position.z) * 0.3;
-
+	float phase = mod(gl_InstanceID, 3.14);
+	position.x += sin(Time * 4 - position.z + phase) * position.z;
+	
 	FragmentUV = VertexUV;
 	//FragmentNormal = mat3(ModelMatrix) * VertexNormal;
 	//FragmentNormal = mat3(inverse(ModelMatrix)) * VertexNormal;

@@ -37,7 +37,7 @@ var fish = Lathe(12, 12, true, func(t, phase float32) m.Vec3 {
 	return m.Vec3{
 		r * float32(sn) * rx,
 		r * float32(cs),
-		(t - 0.5) * 3,
+		(t - 0.3) * 3,
 	}
 })
 
