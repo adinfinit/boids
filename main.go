@@ -77,6 +77,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	mesh := defaultMesh
+
 	// setup instance data
 	var meshVAO uint32
 	gl.GenVertexArrays(1, &meshVAO)
@@ -85,7 +87,7 @@ func main() {
 	var meshVBO uint32
 	gl.GenBuffers(1, &meshVBO)
 	gl.BindBuffer(gl.ARRAY_BUFFER, meshVBO)
-	gl.BufferData(gl.ARRAY_BUFFER, len(cube.Vertices)*int(MeshVertexBytes), gl.Ptr(cube.Vertices), gl.STATIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, len(mesh.Vertices)*int(MeshVertexBytes), gl.Ptr(mesh.Vertices), gl.STATIC_DRAW)
 
 	meshPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
 	gl.EnableVertexAttribArray(meshPositionAttrib)
@@ -102,7 +104,7 @@ func main() {
 	var meshIBO uint32
 	gl.GenBuffers(1, &meshIBO)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshIBO)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 2*len(cube.Indices), gl.Ptr(cube.Indices), gl.STATIC_DRAW)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 2*len(mesh.Indices), gl.Ptr(mesh.Indices), gl.STATIC_DRAW)
 
 	const N = 40
 
@@ -176,7 +178,7 @@ func main() {
 		gl.BindTexture(gl.TEXTURE_2D, texture.ID)
 
 		gl.DrawElementsInstanced(
-			gl.TRIANGLES, int32(len(cube.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
+			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
 			int32(len(models)),
 		)
 

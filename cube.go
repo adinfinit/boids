@@ -12,10 +12,23 @@ func impulse(k, x float32) float32 {
 	return h * float32(math.Exp(float64(1-h)))
 }
 
-var cube = Lathe(12, 12, true, func(t, phase float32) m.Vec3 {
-	r := 12.291*t*t*t - 20*t*t + 8.508*t
+var defaultMesh = fish
+
+var sphere = Lathe(12, 12, true, func(t, phase float32) m.Vec3 {
+	p := 1 - t*2
+	r := -p*p + 1.5
+	sn, cs := math.Sincos(float64(phase))
+	return m.Vec3{
+		r * float32(sn),
+		r * float32(cs),
+		(t - 0.5) * 3,
+	}
+})
+
+var fish = Lathe(12, 12, true, func(t, phase float32) m.Vec3 {
+	r := 12.291*t*t*t - 20*t*t + 8.508*t + 0.01
 	h := 3 * t
-	rx := 0.5 * h * float32(math.Exp(float64(1-h)))
+	rx := 0.5*h*float32(math.Exp(float64(1-h))) + 0.01
 
 	//r := math.Sin(float64(t * math.Pi))
 	//r *= float64(t)
@@ -91,7 +104,7 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 	var headAverage m.Vec3
 	lastLayer, nextLayer := make([]int16, corners), make([]int16, corners)
 	for pi := 0; pi < corners; pi++ {
-		p := float32(pi) * math.Pi * 2 / float32(corners-1)
+		p := float32(pi) * math.Pi * 2 / float32(corners)
 		v := fn(0, p)
 		lastLayer[pi] = mesh.Vertex(v)
 		if capped {
@@ -112,7 +125,7 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 	for ti := 1; ti < depth; ti++ {
 		t := float32(ti) / float32(depth-1)
 		for pi := 0; pi < corners; pi++ {
-			p := float32(pi) * math.Pi * 2 / float32(corners-1)
+			p := float32(pi) * math.Pi * 2 / float32(corners)
 			v := fn(t, p)
 			nextLayer[pi] = mesh.Vertex(v)
 			if capped && ti == depth-1 {
