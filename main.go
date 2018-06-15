@@ -66,7 +66,7 @@ func main() {
 	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
 	diffuseLightPositionUniform := gl.GetUniformLocation(program, gl.Str("DiffuseLightPosition\x00"))
 
-	diffuseLightLocation := m.Vec3{3, 3, 3}
+	diffuseLightLocation := m.Vec3{0, 10, 0}
 	gl.Uniform3f(diffuseLightPositionUniform, diffuseLightLocation[0], diffuseLightLocation[1], diffuseLightLocation[2])
 	gl.Uniform1i(textureUniform, 0)
 

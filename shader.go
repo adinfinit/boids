@@ -83,15 +83,23 @@ out vec3 FragmentPosition;
 out vec3 FragmentNormal;
 out vec2 FragmentUV;
 
+vec3 Swim(vec3 original, float phase) {
+	vec3 result = original;
+	result.x += sin(Time * 4 - original.z + phase) * original.z;
+	return result;
+}
+
 void main() {
-	vec3 position = VertexPosition;
 	float phase = mod(gl_InstanceID, 3.14);
-	position.x += sin(Time * 4 - position.z + phase) * position.z;
+
+	vec3 position = Swim(VertexPosition, phase);
+	vec3 normal = Swim(VertexPosition + VertexNormal * 0.1, phase) - position;
+	normal = normalize(normal);
 	
 	FragmentUV = VertexUV;
-	//FragmentNormal = mat3(ModelMatrix) * VertexNormal;
-	//FragmentNormal = mat3(inverse(ModelMatrix)) * VertexNormal;
-	FragmentNormal = mat3(transpose(inverse(ModelMatrix))) * VertexNormal;
+	//FragmentNormal = mat3(ModelMatrix) * normal;
+	//FragmentNormal = mat3(inverse(ModelMatrix)) * normal;
+	FragmentNormal = mat3(transpose(inverse(ModelMatrix))) * normal;
 	
 	FragmentPosition = (ModelMatrix * vec4(position, 1)).xyz;
     gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(position, 1);
