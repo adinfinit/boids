@@ -83,9 +83,21 @@ out vec3 FragmentPosition;
 out vec3 FragmentNormal;
 out vec2 FragmentUV;
 
+#define SWIM_SPEED 4
+#define SWIM_ROLL_OFFSET 1
+
+vec3 RotateZ(vec3 original, float alpha) {
+	float sn, cs;
+	sn = sin(alpha);
+	cs = cos(alpha);
+	mat2 m = mat2(cs, -sn, sn, cs);
+	return vec3(m * original.xy, original.z);
+}
+
 vec3 Swim(vec3 original, float phase) {
+	original = RotateZ(original, sin(-original.z + phase + Time * SWIM_SPEED - SWIM_ROLL_OFFSET)*0.5);
 	vec3 result = original;
-	result.x += sin(Time * 4 - original.z + phase) * original.z;
+	result.x += sin(Time * SWIM_SPEED - original.z + phase) * original.z;
 	return result;
 }
 
