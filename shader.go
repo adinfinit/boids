@@ -68,6 +68,8 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 var vertexShader = `
 #version 330
 
+uniform float Time;
+
 uniform mat4 ProjectionMatrix;
 uniform mat4 CameraMatrix;
 
@@ -82,11 +84,16 @@ out vec3 FragmentNormal;
 out vec2 FragmentUV;
 
 void main() {
-	FragmentUV = VertexUV;
-	FragmentNormal = mat3(transpose(inverse(ModelMatrix))) * VertexNormal;
+	vec3 position = VertexPosition;
+	position.x += sin(Time * 5 - position.z) * 0.3;
 
-	FragmentPosition = (ModelMatrix * vec4(VertexPosition, 1)).xyz;
-    gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(VertexPosition, 1);
+	FragmentUV = VertexUV;
+	//FragmentNormal = mat3(ModelMatrix) * VertexNormal;
+	//FragmentNormal = mat3(inverse(ModelMatrix)) * VertexNormal;
+	FragmentNormal = mat3(transpose(inverse(ModelMatrix))) * VertexNormal;
+	
+	FragmentPosition = (ModelMatrix * vec4(position, 1)).xyz;
+    gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(position, 1);
 }
 ` + "\x00"
 

@@ -4,7 +4,6 @@ import (
 	"flag"
 	_ "image/png"
 	"log"
-	"math"
 	"runtime"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -61,6 +60,7 @@ func main() {
 
 	gl.UseProgram(program)
 
+	timeUniform := gl.GetUniformLocation(program, gl.Str("Time\x00"))
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
 	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
@@ -158,14 +158,15 @@ func main() {
 			for z := -N; z <= N; z++ {
 				//sn := float32(math.Sin(float64(z) + float64(angle)))
 				models[i] = m.Translate3D(float32(x), 0, float32(z)).Mul4(
-					m.Scale3D(0.25, 0.25, 0.25)).
-					Mul4(m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}))
+					m.Scale3D(0.25, 0.25, 0.25))
+				//Mul4(m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}))
 				i++
 			}
 		}
 
 		// Render
 		gl.UseProgram(program)
+		gl.Uniform1f(timeUniform, float32(world.Time))
 		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
 
