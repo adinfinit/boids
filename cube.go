@@ -2,7 +2,6 @@ package main
 
 import (
 	"math"
-	"math/rand"
 	"unsafe"
 
 	m "github.com/go-gl/mathgl/mgl32"
@@ -54,13 +53,13 @@ type MeshVertex struct {
 
 const MeshVertexBytes = int32(unsafe.Sizeof(MeshVertex{}))
 
-func (mesh *MeshData) Vertex(v m.Vec3) int16 {
+func (mesh *MeshData) Vertex(v m.Vec3, uv m.Vec2) int16 {
 	p := len(mesh.Vertices)
 	n := (m.Vec3{v[0], v[1], 0}).Normalize()
 	mesh.Vertices = append(mesh.Vertices, MeshVertex{
 		Position: v,
 		Normal:   n,
-		UV:       m.Vec2{rand.Float32(), rand.Float32()},
+		UV:       uv,
 	})
 
 	return int16(p)
@@ -122,11 +121,12 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 	mesh := MeshData{}
 
 	var headAverage m.Vec3
-	lastLayer, nextLayer := make([]int16, corners), make([]int16, corners)
-	for pi := 0; pi < corners; pi++ {
+	lastLayer, nextLayer := make([]int16, corners+1), make([]int16, corners+1)
+	for pi := 0; pi <= corners; pi++ {
 		p := float32(pi) * math.Pi * 2 / float32(corners)
 		v := fn(0, p)
-		lastLayer[pi] = mesh.Vertex(v)
+		uv := m.Vec2{0, float32(pi) / float32(corners)}
+		lastLayer[pi] = mesh.Vertex(v, uv)
 		if capped {
 			headAverage = headAverage.Add(v)
 		}
@@ -134,9 +134,9 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 
 	if capped {
 		headAverage = headAverage.Mul(1 / float32(corners))
-		z0 := mesh.Vertex(headAverage)
+		z0 := mesh.Vertex(headAverage, m.Vec2{0, 0.5})
 		for pi := 0; pi < corners; pi++ {
-			a, b := lastLayer[pi], lastLayer[(pi+1)%corners]
+			a, b := lastLayer[pi], lastLayer[pi+1]
 			mesh.Triangle(z0, a, b)
 		}
 	}
@@ -144,18 +144,19 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 	var tailAverage m.Vec3
 	for ti := 1; ti < depth; ti++ {
 		t := float32(ti) / float32(depth-1)
-		for pi := 0; pi < corners; pi++ {
+		for pi := 0; pi <= corners; pi++ {
 			p := float32(pi) * math.Pi * 2 / float32(corners)
 			v := fn(t, p)
-			nextLayer[pi] = mesh.Vertex(v)
+			uv := m.Vec2{float32(ti) / float32(depth), float32(pi) / float32(corners)}
+			nextLayer[pi] = mesh.Vertex(v, uv)
 			if capped && ti == depth-1 {
 				tailAverage = tailAverage.Add(v)
 			}
 		}
 
 		for pi := 0; pi < corners; pi++ {
-			a, b := lastLayer[pi], lastLayer[(pi+1)%corners]
-			c, d := nextLayer[pi], nextLayer[(pi+1)%corners]
+			a, b := lastLayer[pi], lastLayer[pi+1]
+			c, d := nextLayer[pi], nextLayer[pi+1]
 			mesh.Triangle(a, c, d)
 			mesh.Triangle(a, d, b)
 		}
@@ -165,15 +166,15 @@ func Lathe(depth, corners int, capped bool, fn func(t, phase float32) m.Vec3) Me
 
 	if capped {
 		tailAverage = tailAverage.Mul(1 / float32(corners))
-		zt := mesh.Vertex(tailAverage)
+		uv := m.Vec2{1, 0.5}
+		zt := mesh.Vertex(tailAverage, uv)
 		for pi := 0; pi < corners; pi++ {
-			a, b := lastLayer[pi], lastLayer[(pi+1)%corners]
+			a, b := lastLayer[pi], lastLayer[pi+1]
 			mesh.Triangle(a, zt, b)
 		}
 	}
 
 	mesh.RecalculateNormals()
-	mesh.WrapCylinder()
 
 	return mesh
 }
