@@ -53,7 +53,12 @@ func main() {
 	world.NextFrameGLFW(window)
 
 	// Configure the vertex and fragment shaders
-	program, err := newProgram(vertexShader, fragmentShader)
+	program, err := newProgram(vertexShader, fragmentShader, "")
+	if err != nil {
+		panic(err)
+	}
+
+	normalProgram, err := newProgram(normalVertexShader, normalFragmentShader, normalGeometryShader)
 	if err != nil {
 		panic(err)
 	}
@@ -166,6 +171,7 @@ func main() {
 
 		// Render
 		gl.UseProgram(program)
+
 		gl.Uniform1f(timeUniform, float32(world.Time))
 		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
@@ -177,6 +183,22 @@ func main() {
 
 		gl.ActiveTexture(gl.TEXTURE0)
 		gl.BindTexture(gl.TEXTURE_2D, texture.ID)
+
+		gl.DrawElementsInstanced(
+			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
+			int32(len(models)),
+		)
+
+		gl.UseProgram(normalProgram)
+
+		gl.Uniform1f(timeUniform, float32(world.Time))
+		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
+		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
+
+		gl.BindBuffer(gl.ARRAY_BUFFER, instanceVBO)
+		gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(models)*Mat4Size, gl.Ptr(models[:]))
+
+		gl.BindVertexArray(meshVAO)
 
 		gl.DrawElementsInstanced(
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
