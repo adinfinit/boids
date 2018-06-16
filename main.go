@@ -58,17 +58,13 @@ func main() {
 		panic(err)
 	}
 
-	normalProgram, err := newProgram(normalVertexShader, normalFragmentShader, normalGeometryShader)
-	if err != nil {
-		panic(err)
-	}
-
 	gl.UseProgram(program)
 
 	timeUniform := gl.GetUniformLocation(program, gl.Str("Time\x00"))
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
 	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
+
 	diffuseLightPositionUniform := gl.GetUniformLocation(program, gl.Str("DiffuseLightPosition\x00"))
 
 	diffuseLightLocation := m.Vec3{0, 10, 0}
@@ -143,7 +139,6 @@ func main() {
 	gl.CullFace(gl.BACK)
 
 	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
-
 	log.Println("ERROR: ", gl.GetError())
 
 	angle := float32(0.0)
@@ -183,22 +178,6 @@ func main() {
 
 		gl.ActiveTexture(gl.TEXTURE0)
 		gl.BindTexture(gl.TEXTURE_2D, texture.ID)
-
-		gl.DrawElementsInstanced(
-			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
-			int32(len(models)),
-		)
-
-		gl.UseProgram(normalProgram)
-
-		gl.Uniform1f(timeUniform, float32(world.Time))
-		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
-		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
-
-		gl.BindBuffer(gl.ARRAY_BUFFER, instanceVBO)
-		gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(models)*Mat4Size, gl.Ptr(models[:]))
-
-		gl.BindVertexArray(meshVAO)
 
 		gl.DrawElementsInstanced(
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),

@@ -49,9 +49,6 @@ func newProgram(vertexShaderSource, fragmentShaderSource, geometryShaderSource s
 		return 0, fmt.Errorf("failed to link program: %v", log)
 	}
 
-	gl.DeleteShader(vertexShader)
-	gl.DeleteShader(fragmentShader)
-
 	return program, nil
 }
 
@@ -86,9 +83,9 @@ uniform float Time;
 uniform mat4 ProjectionMatrix;
 uniform mat4 CameraMatrix;
 
-layout (location = 0) in vec3 VertexPosition;
-layout (location = 1) in vec3 VertexNormal;
-layout (location = 2) in vec2 VertexUV;
+in vec3 VertexPosition;
+in vec3 VertexNormal;
+in vec2 VertexUV;
 
 in mat4 ModelMatrix;
 
