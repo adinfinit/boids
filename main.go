@@ -61,7 +61,7 @@ func (boids *Boids) randomize() {
 			rand.Float32() - 0.5,
 			rand.Float32() - 0.5,
 			rand.Float32() - 0.5,
-		})
+		}).Normalize().Mul(1.5)
 	}
 }
 
@@ -73,7 +73,9 @@ func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
 }
 
 func (boids *Boids) Simulate(world *World) {
-	// TODO:
+	for i, prev := range boids.Position {
+		boids.Position[i] = prev.Add(boids.Velocity[i].Mul(world.DeltaTime))
+	}
 }
 
 func (boids *Boids) Upload() {
@@ -182,7 +184,7 @@ func main() {
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		angle += world.DeltaTime * 0.1
+		angle += world.DeltaTime * 0
 		sn, cs := math.Sincos(float64(angle))
 		world.Camera.Eye[0] = float32(sn) * 10.0
 		world.Camera.Eye[2] = float32(cs) * 10.0
@@ -266,7 +268,7 @@ type Camera struct {
 
 func NewCamera() *Camera {
 	return &Camera{
-		Eye:    m.Vec3{3, 3, 3},
+		Eye:    m.Vec3{5, 5, 5},
 		LookAt: m.Vec3{0, 0, 0},
 		Up:     m.Vec3{0, 1, 0},
 		FOV:    70,

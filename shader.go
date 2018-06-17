@@ -95,7 +95,7 @@ out vec3 FragmentNormal;
 out vec2 FragmentUV;
 
 #define SWIM_SPEED 4
-#define SWIM_ROLL_OFFSET 1
+#define SWIM_ROLL_OFFSET 0.7
 #define SIZE 0.5
 
 mat4 scale(float size) {
@@ -110,7 +110,7 @@ mat4 scale(float size) {
 mat4 LookAt(float size, vec3 pos, vec3 direction) {
 	vec3 up = vec3(0, 1, 0);
 
-	vec3 ww = normalize(direction);
+	vec3 ww = normalize(-direction);
 	vec3 uu = normalize(cross(up, ww));
 	vec3 vv = normalize(cross(ww, uu));
 
@@ -134,7 +134,7 @@ vec3 RotateZ(vec3 original, float alpha) {
 vec3 Swim(vec3 original, float phase) {
 	original = RotateZ(original, sin(-original.z + phase + Time * SWIM_SPEED - SWIM_ROLL_OFFSET)*0.5);
 	vec3 result = original;
-	result.x += sin(Time * SWIM_SPEED - original.z + phase) * original.z;
+	result.x += sin(Time * SWIM_SPEED - original.z + phase) * 0.5;
 	return result;
 }
 
