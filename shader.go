@@ -151,7 +151,7 @@ vec3 Swim(vec3 original, float phase) {
 
 void main() {
 	float phase = mod(gl_InstanceID, 3.14);
-
+	
 	mat4 modelMatrix = LookAt(SIZE, InstancePosition, InstanceHeading);
 	mat4 normalMatrix = transpose(inverse(CameraMatrix * modelMatrix));
 
@@ -163,12 +163,9 @@ void main() {
 	FragmentUV = VertexUV;
 	FragmentNormal = normalize(mat3(normalMatrix) * normal);
 	
-	vec4 fragmentPosition = modelMatrix * vec4(position, 1);
-	vec4 eyePosition = CameraMatrix * fragmentPosition;
-	gl_Position = ProjectionMatrix * eyePosition;
+	gl_Position = ProjectionMatrix * CameraMatrix * modelMatrix * vec4(position, 1);
 
-	FragmentPosition = vec3(fragmentPosition);
-	FragmentOrient = dot(FragmentNormal, normalize(vec3(-eyePosition)));
+	FragmentPosition = vec3(modelMatrix * vec4(position, 1));
 }
 ` + "\x00"
 
@@ -194,28 +191,7 @@ in vec3 FragmentPosition;
 in vec3 FragmentNormal;
 in vec2 FragmentUV;
 
-in float FragmentOrient;
-
 out vec4 OutputColor;
-
-float diNoise(vec3 F, vec3 offset){
-	return	sin(TAU*FragmentPosition.x*F.x*2.0 + 12.0 + offset.x) + cos(TAU*FragmentPosition.z*F.x + 21.0 + offset.x)*
-			sin(TAU*FragmentPosition.y*F.y*2.0 + 23.0 + offset.y) + cos(TAU*FragmentPosition.y*F.y + 32.0 + offset.y)*
-			sin(TAU*FragmentPosition.z*F.z*2.0 + 34.0 + offset.z) + cos(TAU*FragmentPosition.x*F.z + 43.0 + offset.z);
-}
-
-vec3 Iridescense(float orient, float noiseMult, vec3 freqA, vec3 offsetA, vec3 freqB, vec3 offsetB) {
-	vec3 irid;
-	irid.x = abs(cos(TAU*orient*freqA.x + diNoise(freqB, offsetB)*noiseMult + 1.0 + offsetA.x));
-	irid.y = abs(cos(TAU*orient*freqA.y + diNoise(freqB, offsetB)*noiseMult + 2.0 + offsetA.y));
-	irid.z = abs(cos(TAU*orient*freqA.z + diNoise(freqB, offsetB)*noiseMult + 3.0 + offsetA.z));
-	return irid;
-}
-
-float remap(float value, float from0, float from1, float to0, float to1) {
-	float n = (value - from0) / (from1 - from0);
-	return to0 + n * (to1 - to0);
-}
 
 void main() {
 	float ambientLight = 0.1;
@@ -225,26 +201,9 @@ void main() {
 
 	float diffuseShade = clamp(dot(normal, diffuseLightDirection), 0.0, 1.0);
 
-	vec2 uv = FragmentUV;
-	vec4 albedo = texture(AlbedoTexture, uv);
-
-	vec3 iridescense = Iridescense(FragmentOrient, 
-		IRI_NOISE_INTENSITY, 
-		
-		IRI_ORIENTATION_FREQUENCY,
-		IRI_ORIENTATION_OFFSET,
-		
-		IRI_NOISE_FREQUENCY,
-		IRI_NOISE_OFFSET
-	);
-	
-	float space = pow(1.0 - FragmentOrient, 1.0 / IRI_GAMMA);
-	float incidence = remap(space, 0.0, 1.0, IRI_CURVE, 1.0);
+	vec4 albedo = texture(AlbedoTexture, FragmentUV);
 
 	OutputColor = albedo * (ambientLight + diffuseShade);
-		// vec4(iridescense, 1) * incidence * 0.2;
-		// vec4(normal, 1) * 0.5 +
-		// vec4(FragmentOrient, FragmentOrient, FragmentOrient, 1) * 0.5;
 }
 ` + "\x00"
 
