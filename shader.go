@@ -94,6 +94,8 @@ out vec3 FragmentPosition;
 out vec3 FragmentNormal;
 out vec2 FragmentUV;
 
+out float FragmentOrient;
+
 #define SWIM_SPEED 4
 #define SWIM_ROLL_OFFSET 0.7
 #define SIZE 0.2
@@ -104,6 +106,15 @@ mat4 scale(float size) {
 		0, size, 0, 0,
 		0, 0, size, 0,
 		0, 0, 0, 1
+	);
+}
+
+mat4 Translate(vec3 pos) {
+	return mat4(
+		SIZE, 0, 0, 0,
+		0, SIZE, 0, 0,
+		0, 0, SIZE, 0,
+		pos, 1
 	);
 }
 
@@ -142,22 +153,38 @@ void main() {
 	float phase = mod(gl_InstanceID, 3.14);
 
 	mat4 modelMatrix = LookAt(SIZE, InstancePosition, InstanceHeading);
-	mat4 modelMatrixInvT = transpose(inverse(modelMatrix));
+	mat4 normalMatrix = transpose(inverse(CameraMatrix * modelMatrix));
 
+	// vec3 position = VertexPosition;
+	// vec3 normal = VertexNormal;
 	vec3 position = Swim(VertexPosition, phase);
-	vec3 normal = Swim(VertexPosition + VertexNormal * 0.1, phase) - position;
-	normal = normalize(normal);
+	vec3 normal = normalize(Swim(VertexPosition + VertexNormal, phase) - position);
 	
 	FragmentUV = VertexUV;
-	FragmentNormal = mat3(modelMatrixInvT) * normal;
+	FragmentNormal = normalize(mat3(normalMatrix) * normal);
 	
-	FragmentPosition = (modelMatrix * vec4(position, 1)).xyz;
-	gl_Position = ProjectionMatrix * CameraMatrix * modelMatrix * vec4(position, 1);
+	vec4 fragmentPosition = modelMatrix * vec4(position, 1);
+	vec4 eyePosition = CameraMatrix * fragmentPosition;
+	gl_Position = ProjectionMatrix * eyePosition;
+
+	FragmentPosition = vec3(fragmentPosition);
+	FragmentOrient = dot(FragmentNormal, normalize(vec3(-eyePosition)));
 }
 ` + "\x00"
 
 var fragmentShader = `
 #version 330
+
+const float TAU = 2.0 * 3.14;
+
+const float IRI_NOISE_INTENSITY        = 4.0;
+const float IRI_GAMMA = 0.9;
+const float IRI_CURVE = 0.0;
+
+const vec3  IRI_ORIENTATION_FREQUENCY  = vec3(1.0, 1.0, 1.0);
+const vec3  IRI_ORIENTATION_OFFSET     = vec3(0.0, 0.0, 0.0);
+const vec3  IRI_NOISE_FREQUENCY        = vec3(1.0, 1.0, 1.0);
+const vec3  IRI_NOISE_OFFSET           = vec3(0.0, 0.0, 0.0);
 
 uniform sampler2D AlbedoTexture;
 
@@ -167,7 +194,28 @@ in vec3 FragmentPosition;
 in vec3 FragmentNormal;
 in vec2 FragmentUV;
 
+in float FragmentOrient;
+
 out vec4 OutputColor;
+
+float diNoise(vec3 F, vec3 offset){
+	return	sin(TAU*FragmentPosition.x*F.x*2.0 + 12.0 + offset.x) + cos(TAU*FragmentPosition.z*F.x + 21.0 + offset.x)*
+			sin(TAU*FragmentPosition.y*F.y*2.0 + 23.0 + offset.y) + cos(TAU*FragmentPosition.y*F.y + 32.0 + offset.y)*
+			sin(TAU*FragmentPosition.z*F.z*2.0 + 34.0 + offset.z) + cos(TAU*FragmentPosition.x*F.z + 43.0 + offset.z);
+}
+
+vec3 Iridescense(float orient, float noiseMult, vec3 freqA, vec3 offsetA, vec3 freqB, vec3 offsetB) {
+	vec3 irid;
+	irid.x = abs(cos(TAU*orient*freqA.x + diNoise(freqB, offsetB)*noiseMult + 1.0 + offsetA.x));
+	irid.y = abs(cos(TAU*orient*freqA.y + diNoise(freqB, offsetB)*noiseMult + 2.0 + offsetA.y));
+	irid.z = abs(cos(TAU*orient*freqA.z + diNoise(freqB, offsetB)*noiseMult + 3.0 + offsetA.z));
+	return irid;
+}
+
+float remap(float value, float from0, float from1, float to0, float to1) {
+	float n = (value - from0) / (from1 - from0);
+	return to0 + n * (to1 - to0);
+}
 
 void main() {
 	float ambientLight = 0.1;
@@ -178,7 +226,25 @@ void main() {
 	float diffuseShade = clamp(dot(normal, diffuseLightDirection), 0.0, 1.0);
 
 	vec2 uv = FragmentUV;
-    OutputColor = texture(AlbedoTexture, uv) * (ambientLight + diffuseShade);
+	vec4 albedo = texture(AlbedoTexture, uv);
+
+	vec3 iridescense = Iridescense(FragmentOrient, 
+		IRI_NOISE_INTENSITY, 
+		
+		IRI_ORIENTATION_FREQUENCY,
+		IRI_ORIENTATION_OFFSET,
+		
+		IRI_NOISE_FREQUENCY,
+		IRI_NOISE_OFFSET
+	);
+	
+	float space = pow(1.0 - FragmentOrient, 1.0 / IRI_GAMMA);
+	float incidence = remap(space, 0.0, 1.0, IRI_CURVE, 1.0);
+
+	OutputColor = albedo * (ambientLight + diffuseShade);
+		// vec4(iridescense, 1) * incidence * 0.2;
+		// vec4(normal, 1) * 0.5 +
+		// vec4(FragmentOrient, FragmentOrient, FragmentOrient, 1) * 0.5;
 }
 ` + "\x00"
 
