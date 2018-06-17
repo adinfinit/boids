@@ -96,7 +96,7 @@ out vec2 FragmentUV;
 
 #define SWIM_SPEED 4
 #define SWIM_ROLL_OFFSET 0.7
-#define SIZE 0.3
+#define SIZE 0.2
 
 mat4 scale(float size) {
 	return mat4(

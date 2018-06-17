@@ -22,7 +22,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 10000
+	BoidsBatchSize = 20000
 )
 
 type Boids struct {
@@ -75,7 +75,7 @@ func (boids *Boids) initData() {
 	boids.CellHash = make(map[int32][]int32, BoidsBatchSize/10)
 
 	boids.Settings.CellRadius = 5
-	boids.Settings.SeparationWeight = 0
+	boids.Settings.SeparationWeight = 0.5
 	boids.Settings.AlignmentWeight = 0.5
 	boids.Settings.Target = m.Vec3{}
 	boids.Settings.TargetWeight = 0.5
@@ -264,12 +264,9 @@ func main() {
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
 	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
+	gl.Uniform1i(textureUniform, 0)
 
 	diffuseLightPositionUniform := gl.GetUniformLocation(program, gl.Str("DiffuseLightPosition\x00"))
-
-	diffuseLightLocation := m.Vec3{0, 10, 0}
-	gl.Uniform3f(diffuseLightPositionUniform, diffuseLightLocation[0], diffuseLightLocation[1], diffuseLightLocation[2])
-	gl.Uniform1i(textureUniform, 0)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("OutputColor\x00"))
 
@@ -329,6 +326,8 @@ func main() {
 		world.Camera.Eye[0] = float32(sn) * 30.0
 		world.Camera.Eye[2] = float32(cs) * 30.0
 
+		world.DiffuseLightPosition = boids.Settings.Target
+
 		world.NextFrameGLFW(window)
 
 		// Update
@@ -340,6 +339,7 @@ func main() {
 		gl.Uniform1f(timeUniform, float32(world.Time))
 		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
+		gl.Uniform3fv(diffuseLightPositionUniform, 1, &world.DiffuseLightPosition[0])
 
 		boids.Upload()
 
@@ -362,6 +362,8 @@ func main() {
 type World struct {
 	ScreenSize m.Vec2
 	Camera     Camera
+
+	DiffuseLightPosition m.Vec3
 
 	Time      float64
 	DeltaTime float32
