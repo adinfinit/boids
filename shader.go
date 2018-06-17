@@ -96,7 +96,32 @@ out vec2 FragmentUV;
 
 #define SWIM_SPEED 4
 #define SWIM_ROLL_OFFSET 1
-#define SIZE 0.25
+#define SIZE 0.5
+
+mat4 scale(float size) {
+	return mat4(
+		size, 0, 0, 0,
+		0, size, 0, 0,
+		0, 0, size, 0,
+		0, 0, 0, 1
+	);
+}
+
+mat4 LookAt(float size, vec3 pos, vec3 direction) {
+	vec3 up = vec3(0, 1, 0);
+
+	vec3 ww = normalize(direction);
+	vec3 uu = normalize(cross(up, ww));
+	vec3 vv = normalize(cross(ww, uu));
+
+	// not sure whether correct
+	return mat4(
+		uu,  0,
+		vv,  0,
+		ww,  0,
+		pos, 1
+	) * scale(SIZE);
+}
 
 vec3 RotateZ(vec3 original, float alpha) {
 	float sn, cs;
@@ -116,19 +141,8 @@ vec3 Swim(vec3 original, float phase) {
 void main() {
 	float phase = mod(gl_InstanceID, 3.14);
 
-	mat4 modelMatrix = mat4(
-		SIZE, 0, 0, 0,
-		0, SIZE, 0, 0,
-		0, 0, SIZE, 0,
-		InstancePosition.x, InstancePosition.y, InstancePosition.z, 1
-	);
-
-	mat4 modelMatrixInvT = mat4(
-		1.0/SIZE, 0, 0, -InstancePosition.x,
-		0, 1.0/SIZE, 0, -InstancePosition.y,
-		0, 0, 1.0/SIZE, -InstancePosition.z,
-		0, 0, 0, 1
-	);
+	mat4 modelMatrix = LookAt(SIZE, InstancePosition, InstanceVelocity);
+	mat4 modelMatrixInvT = transpose(inverse(modelMatrix));
 
 	vec3 position = Swim(VertexPosition, phase);
 	vec3 normal = Swim(VertexPosition + VertexNormal * 0.1, phase) - position;

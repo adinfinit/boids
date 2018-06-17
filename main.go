@@ -57,6 +57,11 @@ func (boids *Boids) randomize() {
 			rand.Float32()*40 - 20,
 			rand.Float32()*40 - 20,
 		}
+		boids.Velocity[i] = (m.Vec3{
+			rand.Float32() - 0.5,
+			rand.Float32() - 0.5,
+			rand.Float32() - 0.5,
+		})
 	}
 }
 
