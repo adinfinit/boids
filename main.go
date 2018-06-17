@@ -2,11 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	_ "image/png"
 	"log"
 	"math"
 	"math/rand"
 	"runtime"
+	"strconv"
 	"unsafe"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -19,35 +21,37 @@ var (
 	windowHeight = flag.Int("height", 600, "window height")
 )
 
-const BoidsBatchSize = 1024
+const (
+	BoidsBatchSize = 10000
+)
 
 type Boids struct {
 	VBO uint32
 
-	_first       struct{}
-	Position     [BoidsBatchSize]m.Vec3
-	Velocity     [BoidsBatchSize]m.Vec3
-	_last        struct{}
-	Acceleration [BoidsBatchSize]m.Vec3
+	Settings struct {
+		CellRadius       float32
+		SeparationWeight float32
+		AlignmentWeight  float32
+		Target           m.Vec3
+		TargetWeight     float32
+	}
 
+	GPUBoids
+
+	Speed [BoidsBatchSize]float32
 	Color [BoidsBatchSize]m.Vec3
+
+	CellHash       map[int32][]int32
+	CellIndex      [BoidsBatchSize]int32
+	CellAlignment  []m.Vec3
+	CellSeparation []m.Vec3
+	CellCount      []int32
 }
 
-func (boids *Boids) Count() int { return BoidsBatchSize }
-
-func (boids *Boids) size() int {
-	return int(unsafe.Offsetof(boids._last) - unsafe.Offsetof(boids._first))
-}
-
-func (boids *Boids) Init(program uint32) {
-	boids.randomize()
-
-	gl.GenBuffers(1, &boids.VBO)
-	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
-	gl.BufferData(gl.ARRAY_BUFFER, boids.size(), unsafe.Pointer(&boids._first), gl.DYNAMIC_DRAW)
-
-	boids.attribVec3(program, "InstancePosition", unsafe.Offsetof(boids.Position))
-	boids.attribVec3(program, "InstanceVelocity", unsafe.Offsetof(boids.Velocity))
+type GPUBoids struct {
+	Position [BoidsBatchSize]m.Vec3
+	Heading  [BoidsBatchSize]m.Vec3
+	// Matrix  [BoidsBatchSize]m.Mat4
 }
 
 func (boids *Boids) randomize() {
@@ -57,12 +61,154 @@ func (boids *Boids) randomize() {
 			rand.Float32()*40 - 20,
 			rand.Float32()*40 - 20,
 		}
-		boids.Velocity[i] = (m.Vec3{
+		boids.Heading[i] = (m.Vec3{
 			rand.Float32() - 0.5,
 			rand.Float32() - 0.5,
 			rand.Float32() - 0.5,
-		}).Normalize().Mul(1.5)
+		}).Normalize()
+		boids.Speed[i] = 5
 	}
+}
+
+func (boids *Boids) initData() {
+	// boids.GPUBoids = &GPUBoids{}
+	boids.CellHash = make(map[int32][]int32, BoidsBatchSize/10)
+
+	boids.Settings.CellRadius = 5
+	boids.Settings.SeparationWeight = 0
+	boids.Settings.AlignmentWeight = 0.5
+	boids.Settings.Target = m.Vec3{}
+	boids.Settings.TargetWeight = 0.5
+}
+
+func (boids *Boids) Simulate(world *World) {
+	sn, cs := math.Sincos(float64(world.Time))
+	boids.Settings.Target = m.Vec3{
+		float32(sn) * 10,
+		0,
+		float32(cs) * 10,
+	}
+	boids.Settings.TargetWeight = float32(math.Sin(world.Time*0.5)*0.3 + 0.3)
+
+	for hash := range boids.CellHash {
+		delete(boids.CellHash, hash)
+	}
+
+	boids.hashPositions(boids.Settings.CellRadius)
+	boids.resizeCells()
+	boids.computeCells(world)
+	boids.steer(world)
+	boids.moveForward(world)
+}
+
+func (boids *Boids) hashPositions(radius float32) {
+	for i, pos := range boids.Position {
+		p := pos.Mul(1 / radius)
+		x, y, z := int32(p[0]), int32(p[1]), int32(p[2])
+
+		hash := x
+		hash += (hash * 397) ^ y
+		hash += (hash * 397) ^ z
+		hash += hash << 3
+		hash ^= hash >> 11
+		hash += hash << 15
+
+		boids.CellHash[hash] = append(boids.CellHash[hash], int32(i))
+	}
+}
+
+func (boids *Boids) resizeCells() {
+	if cap(boids.CellAlignment) < len(boids.CellHash) {
+		boids.CellAlignment = make([]m.Vec3, len(boids.CellHash))
+		boids.CellSeparation = make([]m.Vec3, len(boids.CellHash))
+		boids.CellCount = make([]int32, len(boids.CellHash))
+	}
+
+	boids.CellAlignment = boids.CellAlignment[:len(boids.CellHash)]
+	boids.CellSeparation = boids.CellSeparation[:len(boids.CellHash)]
+	boids.CellCount = boids.CellCount[:len(boids.CellHash)]
+}
+
+func (boids *Boids) computeCells(world *World) {
+	cellIndex := int32(0)
+	for _, indices := range boids.CellHash {
+		alignment := m.Vec3{}
+		separation := m.Vec3{}
+
+		for _, boidIndex := range indices {
+			boids.CellIndex[boidIndex] = cellIndex
+			alignment = alignment.Add(boids.Heading[boidIndex])
+			separation = separation.Add(boids.Position[boidIndex])
+		}
+
+		boids.CellAlignment[cellIndex] = alignment.Mul(1.0 / float32(len(indices)))
+		boids.CellSeparation[cellIndex] = separation.Mul(1.0 / float32(len(indices)))
+
+		cellIndex++
+	}
+}
+
+func check(t string, ps ...m.Vec3) {
+	for i, p := range ps {
+		if math.IsNaN(float64(p[0])) || math.IsNaN(float64(p[1])) || math.IsNaN(float64(p[2])) {
+			fmt.Println(ps)
+			panic(t + "=" + strconv.Itoa(i))
+		}
+	}
+}
+
+func safeNormalize(v m.Vec3, s float32) m.Vec3 {
+	l := v.Len()
+	if l < 1e-3 {
+		return m.Vec3{0, 0, s}
+		//return (m.Vec3{rand.Float32() - 0.5, rand.Float32() - 0.5, rand.Float32() - 0.5}).Normalize()
+	}
+	return v.Mul(s / l)
+}
+
+func (boids *Boids) steer(world *World) {
+	dt := world.DeltaTime
+	targetPosition := boids.Settings.Target
+	for i := range boids.Position {
+		cell := boids.CellIndex[i]
+		pos := boids.Position[i]
+		head := boids.Heading[i]
+
+		alignment := safeNormalize(boids.CellAlignment[cell].Sub(head), boids.Settings.AlignmentWeight)
+		separation := safeNormalize(pos.Sub(boids.CellSeparation[cell]), boids.Settings.SeparationWeight)
+		target := safeNormalize(targetPosition.Sub(pos), boids.Settings.TargetWeight)
+
+		normalHeading := safeNormalize(alignment.Add(separation).Add(target), 1)
+
+		boids.Heading[i] = safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
+	}
+}
+
+func (boids *Boids) moveForward(world *World) {
+	dt := world.DeltaTime
+	for i, prev := range boids.Position {
+		head := boids.Heading[i]
+		speed := boids.Speed[i]
+		boids.Position[i] = prev.Add(head.Mul(dt * speed))
+	}
+}
+
+func (boids *Boids) Count() int { return BoidsBatchSize }
+
+func (boids *Boids) size() int {
+	return int(unsafe.Sizeof(boids.GPUBoids))
+}
+
+func (boids *Boids) Init(program uint32) {
+	boids.initData()
+	boids.randomize()
+
+	gl.GenBuffers(1, &boids.VBO)
+	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
+	gl.BufferData(gl.ARRAY_BUFFER, boids.size(), unsafe.Pointer(&boids.GPUBoids), gl.DYNAMIC_DRAW)
+
+	boids.attribVec3(program, "InstancePosition", unsafe.Offsetof(boids.GPUBoids.Position))
+	boids.attribVec3(program, "InstanceHeading", unsafe.Offsetof(boids.GPUBoids.Heading))
 }
 
 func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
@@ -72,15 +218,9 @@ func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
 	gl.VertexAttribDivisor(attrib, 1)
 }
 
-func (boids *Boids) Simulate(world *World) {
-	for i, prev := range boids.Position {
-		boids.Position[i] = prev.Add(boids.Velocity[i].Mul(world.DeltaTime))
-	}
-}
-
 func (boids *Boids) Upload() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
-	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.size(), unsafe.Pointer(&boids._first))
+	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.size(), unsafe.Pointer(&boids.GPUBoids))
 }
 
 const Mat4Size = 16 * 4
@@ -167,7 +307,7 @@ func main() {
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshIBO)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 2*len(mesh.Indices), gl.Ptr(mesh.Indices), gl.STATIC_DRAW)
 
-	var boids Boids
+	boids := &Boids{}
 	boids.Init(program)
 
 	// Configure global settings
@@ -186,8 +326,8 @@ func main() {
 
 		angle += world.DeltaTime * 0
 		sn, cs := math.Sincos(float64(angle))
-		world.Camera.Eye[0] = float32(sn) * 10.0
-		world.Camera.Eye[2] = float32(cs) * 10.0
+		world.Camera.Eye[0] = float32(sn) * 30.0
+		world.Camera.Eye[2] = float32(cs) * 30.0
 
 		world.NextFrameGLFW(window)
 
@@ -268,7 +408,7 @@ type Camera struct {
 
 func NewCamera() *Camera {
 	return &Camera{
-		Eye:    m.Vec3{5, 5, 5},
+		Eye:    m.Vec3{30, 30, 30},
 		LookAt: m.Vec3{0, 0, 0},
 		Up:     m.Vec3{0, 1, 0},
 		FOV:    70,

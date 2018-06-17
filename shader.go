@@ -88,7 +88,7 @@ in vec3 VertexNormal;
 in vec2 VertexUV;
 
 in vec3 InstancePosition;
-in vec3 InstanceVelocity;
+in vec3 InstanceHeading;
 
 out vec3 FragmentPosition;
 out vec3 FragmentNormal;
@@ -96,7 +96,7 @@ out vec2 FragmentUV;
 
 #define SWIM_SPEED 4
 #define SWIM_ROLL_OFFSET 0.7
-#define SIZE 0.5
+#define SIZE 0.3
 
 mat4 scale(float size) {
 	return mat4(
@@ -141,7 +141,7 @@ vec3 Swim(vec3 original, float phase) {
 void main() {
 	float phase = mod(gl_InstanceID, 3.14);
 
-	mat4 modelMatrix = LookAt(SIZE, InstancePosition, InstanceVelocity);
+	mat4 modelMatrix = LookAt(SIZE, InstancePosition, InstanceHeading);
 	mat4 modelMatrixInvT = transpose(inverse(modelMatrix));
 
 	vec3 position = Swim(VertexPosition, phase);
