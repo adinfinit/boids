@@ -35,7 +35,7 @@ var fish = Lathe(12, 12, true, func(t, phase float32) m.Vec3 {
 	sn, cs := math.Sincos(float64(phase))
 	return m.Vec3{
 		r * float32(sn) * rx,
-		r * float32(cs),
+		r * float32(cs) * 0.7,
 		(t - 0.3) * 3,
 	}
 })
