@@ -87,7 +87,8 @@ in vec3 VertexPosition;
 in vec3 VertexNormal;
 in vec2 VertexUV;
 
-in mat4 ModelMatrix;
+in vec3 InstancePosition;
+in vec3 InstanceVelocity;
 
 out vec3 FragmentPosition;
 out vec3 FragmentNormal;
@@ -95,6 +96,7 @@ out vec2 FragmentUV;
 
 #define SWIM_SPEED 4
 #define SWIM_ROLL_OFFSET 1
+#define SIZE 0.25
 
 vec3 RotateZ(vec3 original, float alpha) {
 	float sn, cs;
@@ -114,17 +116,29 @@ vec3 Swim(vec3 original, float phase) {
 void main() {
 	float phase = mod(gl_InstanceID, 3.14);
 
+	mat4 modelMatrix = mat4(
+		SIZE, 0, 0, 0,
+		0, SIZE, 0, 0,
+		0, 0, SIZE, 0,
+		InstancePosition.x, InstancePosition.y, InstancePosition.z, 1
+	);
+
+	mat4 modelMatrixInvT = mat4(
+		1.0/SIZE, 0, 0, -InstancePosition.x,
+		0, 1.0/SIZE, 0, -InstancePosition.y,
+		0, 0, 1.0/SIZE, -InstancePosition.z,
+		0, 0, 0, 1
+	);
+
 	vec3 position = Swim(VertexPosition, phase);
 	vec3 normal = Swim(VertexPosition + VertexNormal * 0.1, phase) - position;
 	normal = normalize(normal);
 	
 	FragmentUV = VertexUV;
-	//FragmentNormal = mat3(ModelMatrix) * normal;
-	//FragmentNormal = mat3(inverse(ModelMatrix)) * normal;
-	FragmentNormal = mat3(transpose(inverse(ModelMatrix))) * normal;
+	FragmentNormal = mat3(modelMatrixInvT) * normal;
 	
-	FragmentPosition = (ModelMatrix * vec4(position, 1)).xyz;
-    gl_Position = ProjectionMatrix * CameraMatrix * ModelMatrix * vec4(position, 1);
+	FragmentPosition = (modelMatrix * vec4(position, 1)).xyz;
+	gl_Position = ProjectionMatrix * CameraMatrix * modelMatrix * vec4(position, 1);
 }
 ` + "\x00"
 
@@ -166,7 +180,6 @@ in vec3 VertexPosition;
 in vec3 VertexNormal;
 in vec2 VertexUV;
 
-in mat4 ModelMatrix;
 
 out VS_OUT {
 	vec3 FragmentNormal;

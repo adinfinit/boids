@@ -4,7 +4,9 @@ import (
 	"flag"
 	_ "image/png"
 	"log"
+	"math/rand"
 	"runtime"
+	"unsafe"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
@@ -16,11 +18,61 @@ var (
 	windowHeight = flag.Int("height", 600, "window height")
 )
 
+const BoidsBatchSize = 1024
+
 type Boids struct {
-	Position     [1024]m.Vec4
-	Velocity     [1024]m.Vec4
-	Acceleration [1024]m.Vec4
-	Color        [1024]m.Vec4
+	VBO uint32
+
+	_first       struct{}
+	Position     [BoidsBatchSize]m.Vec3
+	Velocity     [BoidsBatchSize]m.Vec3
+	_last        struct{}
+	Acceleration [BoidsBatchSize]m.Vec3
+
+	Color [BoidsBatchSize]m.Vec3
+}
+
+func (boids *Boids) Count() int { return BoidsBatchSize }
+
+func (boids *Boids) size() int {
+	return int(unsafe.Offsetof(boids._last) - unsafe.Offsetof(boids._first))
+}
+
+func (boids *Boids) Init(program uint32) {
+	boids.randomize()
+
+	gl.GenBuffers(1, &boids.VBO)
+	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
+	gl.BufferData(gl.ARRAY_BUFFER, boids.size(), unsafe.Pointer(&boids._first), gl.DYNAMIC_DRAW)
+
+	boids.attribVec3(program, "InstancePosition", unsafe.Offsetof(boids.Position))
+	boids.attribVec3(program, "InstanceVelocity", unsafe.Offsetof(boids.Velocity))
+}
+
+func (boids *Boids) randomize() {
+	for i := range boids.Position {
+		boids.Position[i] = m.Vec3{
+			rand.Float32()*40 - 20,
+			rand.Float32()*40 - 20,
+			rand.Float32()*40 - 20,
+		}
+	}
+}
+
+func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
+	attrib := uint32(gl.GetAttribLocation(program, gl.Str(name+"\x00")))
+	gl.EnableVertexAttribArray(attrib)
+	gl.VertexAttribPointer(attrib, 3, gl.FLOAT, false, 3*4, unsafe.Pointer(offset))
+	gl.VertexAttribDivisor(attrib, 1)
+}
+
+func (boids *Boids) Simulate(world *World) {
+	// TODO:
+}
+
+func (boids *Boids) Upload() {
+	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
+	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.size(), unsafe.Pointer(&boids._first))
 }
 
 const Mat4Size = 16 * 4
@@ -38,7 +90,7 @@ func main() {
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
-	window, err := glfw.CreateWindow(*windowWidth, *windowHeight, "Window Size", nil, nil)
+	window, err := glfw.CreateWindow(*windowWidth, *windowHeight, "Boids", nil, nil)
 	if err != nil {
 		log.Fatalln("failed to create window: ", err)
 	}
@@ -107,29 +159,8 @@ func main() {
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshIBO)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 2*len(mesh.Indices), gl.Ptr(mesh.Indices), gl.STATIC_DRAW)
 
-	const N = 40
-
-	var models []m.Mat4
-	for x := -N; x <= N; x++ {
-		for z := -N; z <= N; z++ {
-			models = append(models,
-				m.Translate3D(float32(x), 0, float32(z)).
-					Mul4(m.Scale3D(0.25, 0.25, 0.25)))
-		}
-	}
-
-	var instanceVBO uint32
-	gl.GenBuffers(1, &instanceVBO)
-	gl.BindBuffer(gl.ARRAY_BUFFER, instanceVBO)
-	gl.BufferData(gl.ARRAY_BUFFER, len(models)*Mat4Size, gl.Ptr(models[:]), gl.DYNAMIC_DRAW)
-
-	instanceMatrixAttrib := uint32(gl.GetAttribLocation(program, gl.Str("ModelMatrix\x00")))
-	for i := 0; i < 4; i++ {
-		attrib := instanceMatrixAttrib + uint32(i)
-		gl.EnableVertexAttribArray(attrib)
-		gl.VertexAttribPointer(attrib, 4, gl.FLOAT, false, Mat4Size, gl.PtrOffset(i*4*4))
-		gl.VertexAttribDivisor(attrib, 1)
-	}
+	var boids Boids
+	boids.Init(program)
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -145,6 +176,7 @@ func main() {
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
+		angle += world.DeltaTime
 		// sn, cs := math.Sincos(float64(angle))
 		// world.Camera.Eye[0] = float32(sn) * 3.0
 		// world.Camera.Eye[2] = float32(cs) * 3.0
@@ -152,17 +184,7 @@ func main() {
 		world.NextFrameGLFW(window)
 
 		// Update
-		angle += world.DeltaTime
-		i := 0
-		for x := -N; x <= N; x++ {
-			for z := -N; z <= N; z++ {
-				//sn := float32(math.Sin(float64(z) + float64(angle)))
-				models[i] = m.Translate3D(float32(x), 0, float32(z)).Mul4(
-					m.Scale3D(0.25, 0.25, 0.25))
-				//Mul4(m.HomogRotate3D(angle+float32(i)*math.Phi, m.Vec3{0, 1, 0}))
-				i++
-			}
-		}
+		boids.Simulate(world)
 
 		// Render
 		gl.UseProgram(program)
@@ -171,8 +193,7 @@ func main() {
 		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
 
-		gl.BindBuffer(gl.ARRAY_BUFFER, instanceVBO)
-		gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(models)*Mat4Size, gl.Ptr(models[:]))
+		boids.Upload()
 
 		gl.BindVertexArray(meshVAO)
 
@@ -181,7 +202,7 @@ func main() {
 
 		gl.DrawElementsInstanced(
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
-			int32(len(models)),
+			int32(boids.Count()),
 		)
 
 		// Maintenance
