@@ -4,6 +4,7 @@ import (
 	"flag"
 	_ "image/png"
 	"log"
+	"math"
 	"math/rand"
 	"runtime"
 	"unsafe"
@@ -169,17 +170,17 @@ func main() {
 	gl.Enable(gl.CULL_FACE)
 	gl.CullFace(gl.BACK)
 
-	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
+	gl.ClearColor(0x26/255.0, 0x42/255.0, 0x6b/255.0, 1.0)
 	log.Println("ERROR: ", gl.GetError())
 
 	angle := float32(0.0)
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		angle += world.DeltaTime
-		// sn, cs := math.Sincos(float64(angle))
-		// world.Camera.Eye[0] = float32(sn) * 3.0
-		// world.Camera.Eye[2] = float32(cs) * 3.0
+		angle += world.DeltaTime * 0.1
+		sn, cs := math.Sincos(float64(angle))
+		world.Camera.Eye[0] = float32(sn) * 10.0
+		world.Camera.Eye[2] = float32(cs) * 10.0
 
 		world.NextFrameGLFW(window)
 
@@ -263,7 +264,7 @@ func NewCamera() *Camera {
 		Eye:    m.Vec3{3, 3, 3},
 		LookAt: m.Vec3{0, 0, 0},
 		Up:     m.Vec3{0, 1, 0},
-		FOV:    45,
+		FOV:    70,
 	}
 }
 
