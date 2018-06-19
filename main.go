@@ -23,7 +23,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 50000
+	BoidsBatchSize = 10000
 )
 
 type Boids struct {
@@ -40,7 +40,6 @@ type Boids struct {
 	GPUBoids
 
 	Speed [BoidsBatchSize]float32
-	Color [BoidsBatchSize]g.Vec3
 
 	CellHash       map[int32][]int32
 	CellIndex      [BoidsBatchSize]int32
@@ -52,6 +51,8 @@ type Boids struct {
 type GPUBoids struct {
 	Position [BoidsBatchSize]g.Vec3
 	Heading  [BoidsBatchSize]g.Vec3
+	_static  struct{}
+	Color    [BoidsBatchSize]g.Color
 	// Matrix  [BoidsBatchSize]g.Mat4
 }
 
@@ -68,6 +69,7 @@ func (boids *Boids) randomize() {
 			rand.Float32()-0.5,
 		).Normalize()
 		boids.Speed[i] = 5
+		boids.Color[i] = g.HSL(rand.Float32()*0.3+0.3, 0.8, 0.8)
 	}
 }
 
@@ -199,6 +201,9 @@ func (boids *Boids) Count() int { return BoidsBatchSize }
 func (boids *Boids) size() int {
 	return int(unsafe.Sizeof(boids.GPUBoids))
 }
+func (boids *Boids) dynamicSize() int {
+	return int(unsafe.Offsetof(boids._static))
+}
 
 func (boids *Boids) Init(program uint32) {
 	boids.initData()
@@ -210,6 +215,7 @@ func (boids *Boids) Init(program uint32) {
 
 	boids.attribVec3(program, "InstancePosition", unsafe.Offsetof(boids.GPUBoids.Position))
 	boids.attribVec3(program, "InstanceHeading", unsafe.Offsetof(boids.GPUBoids.Heading))
+	boids.attribRGBA8(program, "InstanceColor", unsafe.Offsetof(boids.GPUBoids.Color))
 }
 
 func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
@@ -219,9 +225,16 @@ func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
 	gl.VertexAttribDivisor(attrib, 1)
 }
 
+func (boids *Boids) attribRGBA8(program uint32, name string, offset uintptr) {
+	attrib := uint32(gl.GetAttribLocation(program, gl.Str(name+"\x00")))
+	gl.EnableVertexAttribArray(attrib)
+	gl.VertexAttribPointer(attrib, 4, gl.UNSIGNED_BYTE, true, 4, unsafe.Pointer(offset))
+	gl.VertexAttribDivisor(attrib, 1)
+}
+
 func (boids *Boids) Upload() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
-	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.size(), unsafe.Pointer(&boids.GPUBoids))
+	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.dynamicSize(), unsafe.Pointer(&boids.GPUBoids))
 }
 
 const Mat4Size = 16 * 4
@@ -254,22 +267,22 @@ func main() {
 	world.NextFrameGLFW(window)
 
 	// Configure the vertex and fragment shaders
-	program, err := newProgram(vertexShader, fragmentShader, "")
+	boidProgram, err := newProgram(vertexShader, fragmentShader, "")
 	if err != nil {
 		panic(err)
 	}
 
-	gl.UseProgram(program)
+	gl.UseProgram(boidProgram)
 
-	timeUniform := gl.GetUniformLocation(program, gl.Str("Time\x00"))
-	projectionUniform := gl.GetUniformLocation(program, gl.Str("ProjectionMatrix\x00"))
-	cameraUniform := gl.GetUniformLocation(program, gl.Str("CameraMatrix\x00"))
-	textureUniform := gl.GetUniformLocation(program, gl.Str("AlbedoTexture\x00"))
+	timeUniform := gl.GetUniformLocation(boidProgram, gl.Str("Time\x00"))
+	projectionUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionMatrix\x00"))
+	cameraUniform := gl.GetUniformLocation(boidProgram, gl.Str("CameraMatrix\x00"))
+	textureUniform := gl.GetUniformLocation(boidProgram, gl.Str("AlbedoTexture\x00"))
 	gl.Uniform1i(textureUniform, 0)
 
-	diffuseLightPositionUniform := gl.GetUniformLocation(program, gl.Str("DiffuseLightPosition\x00"))
+	diffuseLightPositionUniform := gl.GetUniformLocation(boidProgram, gl.Str("DiffuseLightPosition\x00"))
 
-	gl.BindFragDataLocation(program, 0, gl.Str("OutputColor\x00"))
+	gl.BindFragDataLocation(boidProgram, 0, gl.Str("OutputColor\x00"))
 
 	texture, err := LoadTexture("fish.png")
 	if err != nil {
@@ -288,15 +301,15 @@ func main() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, meshVBO)
 	gl.BufferData(gl.ARRAY_BUFFER, len(mesh.Vertices)*int(MeshVertexBytes), gl.Ptr(mesh.Vertices), gl.STATIC_DRAW)
 
-	meshPositionAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexPosition\x00")))
+	meshPositionAttrib := uint32(gl.GetAttribLocation(boidProgram, gl.Str("VertexPosition\x00")))
 	gl.EnableVertexAttribArray(meshPositionAttrib)
 	gl.VertexAttribPointer(meshPositionAttrib, 3, gl.FLOAT, false, MeshVertexBytes, gl.PtrOffset(0))
 
-	meshNormalAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexNormal\x00")))
+	meshNormalAttrib := uint32(gl.GetAttribLocation(boidProgram, gl.Str("VertexNormal\x00")))
 	gl.EnableVertexAttribArray(meshNormalAttrib)
 	gl.VertexAttribPointer(meshNormalAttrib, 3, gl.FLOAT, false, MeshVertexBytes, gl.PtrOffset(3*4))
 
-	meshUVAttrib := uint32(gl.GetAttribLocation(program, gl.Str("VertexUV\x00")))
+	meshUVAttrib := uint32(gl.GetAttribLocation(boidProgram, gl.Str("VertexUV\x00")))
 	gl.EnableVertexAttribArray(meshUVAttrib)
 	gl.VertexAttribPointer(meshUVAttrib, 2, gl.FLOAT, false, MeshVertexBytes, gl.PtrOffset(3*4+3*4))
 
@@ -306,7 +319,7 @@ func main() {
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 2*len(mesh.Indices), gl.Ptr(mesh.Indices), gl.STATIC_DRAW)
 
 	boids := &Boids{}
-	boids.Init(program)
+	boids.Init(boidProgram)
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -336,16 +349,20 @@ func main() {
 		boids.Simulate(world)
 		simStop := hrtime.Now()
 
+		// Upload
+		uploadStart := hrtime.Now()
+		boids.Upload()
+		uploadStop := hrtime.Now()
+
 		// Render
 		renderStart := hrtime.Now()
-		gl.UseProgram(program)
+
+		gl.UseProgram(boidProgram)
 
 		gl.Uniform1f(timeUniform, float32(world.Time))
 		gl.UniformMatrix4fv(projectionUniform, 1, false, world.Camera.Projection.Ptr())
 		gl.UniformMatrix4fv(cameraUniform, 1, false, world.Camera.Camera.Ptr())
 		gl.Uniform3fv(diffuseLightPositionUniform, 1, world.DiffuseLightPosition.Ptr())
-
-		boids.Upload()
 
 		gl.BindVertexArray(meshVAO)
 
@@ -356,9 +373,10 @@ func main() {
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
 			int32(boids.Count()),
 		)
+
 		renderStop := hrtime.Now()
 
-		window.SetTitle(fmt.Sprintf("Sim:\t%v\tRender:\t%v", simStop-simStart, renderStop-renderStart))
+		window.SetTitle(fmt.Sprintf("Sim:\t%v\tUpload:\t%v\tRender:\t%v", simStop-simStart, uploadStop-uploadStart, renderStop-renderStart))
 
 		// Maintenance
 		window.SwapBuffers()
