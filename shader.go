@@ -84,6 +84,8 @@ uniform mat4 ProjectionMatrix;
 uniform mat4 CameraMatrix;
 uniform mat4 ProjectionCameraMatrix;
 
+uniform vec3 DiffuseLightPosition;
+
 in vec3 VertexPosition;
 in vec3 VertexNormal;
 in vec2 VertexUV;
@@ -92,11 +94,7 @@ in vec3  InstancePosition;
 in vec3  InstanceHeading;
 in float InstanceHue;
 
-out vec3 FragmentPosition;
-out vec2 FragmentUV;
 out vec3 FragmentColor;
-
-out vec3 ScreenNormal;
 
 const float SWIM_SPEED = 4;
 const float SWIM_ROLL_OFFSET = 0.7;
@@ -169,41 +167,28 @@ void main() {
 	vec3 position = Swim(VertexPosition, twistRotation, wiggleAmount);
 	vec3 normal = normalize(Swim(VertexPosition + VertexNormal, twistRotation, wiggleAmount) - position);
 	
-	FragmentUV = VertexUV;
-	ScreenNormal = mat3(normalMatrix) * normal;
-	
 	vec4 fragmentPosition = modelMatrix * vec4(position, 1);
 	gl_Position = ProjectionCameraMatrix * fragmentPosition;
 
-	FragmentPosition = fragmentPosition.xyz;
-	FragmentColor = hsv2rgb(vec3(InstanceHue * 0.3, 0.8, 0.7));
+	// lighting
+	vec3 albedo = hsv2rgb(vec3(InstanceHue * 0.3, 0.8, 0.7));
+	float ambientLight = 0.2;
+	
+	vec3 screenNormal = normalize(mat3(normalMatrix) * normal);
+	vec3 diffuseLightDirection = normalize(DiffuseLightPosition - fragmentPosition.xyz);
+	float diffuseShade = clamp(dot(screenNormal, diffuseLightDirection), 0.0, 1.0);
+
+	FragmentColor = albedo * (ambientLight + diffuseShade);
 }
 ` + "\x00"
 
 var fragmentShader = `
 #version 330
 
-const float TAU = 2.0 * 3.14;
-
-uniform vec3 DiffuseLightPosition;
-
-in vec3 FragmentPosition;
-in vec2 FragmentUV;
-in vec3 FragmentColor;
-
-in vec3 ScreenNormal;
-
+in  vec3 FragmentColor;
 out vec4 OutputColor;
 
 void main() {
-	float ambientLight = 0.2;
-	
-	vec3 normal = normalize(ScreenNormal);
-	vec3 diffuseLightDirection = normalize(DiffuseLightPosition - FragmentPosition);
-
-	float diffuseShade = clamp(dot(normal, diffuseLightDirection), 0.0, 1.0);
-
-	vec4 albedo = vec4(FragmentColor, 1);
-	OutputColor = albedo * (ambientLight + diffuseShade);
+	OutputColor = vec4(FragmentColor, 1);
 }
 ` + "\x00"
