@@ -92,7 +92,6 @@ in vec2 VertexUV;
 
 in vec3  InstancePosition;
 in vec3  InstanceHeading;
-in float InstanceHue;
 
 out vec3 FragmentColor;
 
@@ -171,7 +170,8 @@ void main() {
 	gl_Position = ProjectionCameraMatrix * fragmentPosition;
 
 	// lighting
-	vec3 albedo = vec3(InstanceHue);
+	float hue = mod(gl_InstanceID * 0.011111, 1);
+	vec3 albedo = vec3(hue);
 	float ambientLight = 0.3;
 	
 	vec3 screenNormal = normalize(mat3(normalMatrix) * normal);

@@ -61,7 +61,6 @@ type Boids struct {
 type GPUBoids struct {
 	Position [BoidsBatchSize]g.Vec3
 	Heading  [BoidsBatchSize]g.Vec3
-	Hue      [BoidsBatchSize]float32
 }
 
 func (boids *Boids) randomize() {
@@ -77,7 +76,6 @@ func (boids *Boids) randomize() {
 			rand.Float32()-0.5,
 		).Normalize()
 		boids.Speed[i] = 5
-		boids.Hue[i] = rand.Float32()
 	}
 }
 
@@ -138,8 +136,7 @@ func (boids *Boids) Simulate(world *World) {
 	boids.hashPositions(boids.Settings.CellRadius)
 	boids.resizeCells()
 	boids.computeCells(world)
-	boids.steer(world)
-	boids.moveForward(world)
+	boids.steerAndMove(world)
 }
 
 func (boids *Boids) hashPositions(radius float32) {
@@ -235,8 +232,8 @@ func safeNormalize(v g.Vec3, s float32) g.Vec3 {
 	return v.Mul(s / g.Sqrt(l))
 }
 
-func (boids *Boids) steer(world *World) {
-	defer bench("steer")()
+func (boids *Boids) steerAndMove(world *World) {
+	defer bench("steerAndMove")()
 	dt := world.DeltaTime
 
 	async.BlockIter(len(boids.Position), *procs, func(start, limit int) {
@@ -250,25 +247,17 @@ func (boids *Boids) steer(world *World) {
 			cellAlignment := boids.CellAlignment[cell]
 			cellTarget := boids.CellTarget[cell]
 
-			alignment := safeNormalize(cellAlignment.Sub(head), boids.Settings.AlignmentWeight)
 			separation := safeNormalize(pos.Sub(cellSeparation), boids.Settings.SeparationWeight)
 			target := safeNormalize(cellTarget.Sub(pos), boids.Settings.TargetWeight)
+			alignment := safeNormalize(cellAlignment.Sub(head), boids.Settings.AlignmentWeight)
 
 			normalHeading := safeNormalize(alignment.Add(separation).Add(target), 1)
-			boids.Heading[i] = safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
+			newHeading := safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
+			boids.Heading[i] = newHeading
+
+			boids.Position[i] = boids.Position[i].Add(newHeading.Mul(dt * boids.Speed[i]))
 		}
 	})
-}
-
-func (boids *Boids) moveForward(world *World) {
-	defer bench("moveForward")()
-
-	dt := world.DeltaTime
-	for i, prev := range boids.Position {
-		head := boids.Heading[i]
-		speed := boids.Speed[i]
-		boids.Position[i] = prev.Add(head.Mul(dt * speed))
-	}
 }
 
 func (boids *Boids) Count() int { return BoidsBatchSize }
@@ -286,7 +275,6 @@ func (boids *Boids) Init(program uint32) {
 
 	boids.attribVec3(program, "InstancePosition", unsafe.Offsetof(boids.GPUBoids.Position))
 	boids.attribVec3(program, "InstanceHeading", unsafe.Offsetof(boids.GPUBoids.Heading))
-	boids.attribFloat(program, "InstanceHue", unsafe.Offsetof(boids.GPUBoids.Hue))
 }
 
 func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
