@@ -94,7 +94,7 @@ in float InstanceHue;
 
 out vec3 FragmentPosition;
 out vec2 FragmentUV;
-out vec4 FragmentColor;
+out vec3 FragmentColor;
 
 out vec3 ScreenNormal;
 
@@ -103,15 +103,30 @@ const float SWIM_ROLL_OFFSET = 0.7;
 const float SIZE = 0.2;
 
 mat4 LookAt(float size, vec3 pos, vec3 direction) {
+	vec3 up = vec3(0, 1, 0);
 	vec3 ww = normalize(-direction);
-	vec3 uu = normalize(cross(vec3(0, 1, 0), ww));
+	vec3 uu = normalize(cross(up, ww));
 	vec3 vv = normalize(cross(ww, uu));
 
 	// not sure whether correct
 	return mat4(
-		uu * SIZE,  0,
-		vv * SIZE,  0,
-		ww * SIZE,  0,
+		uu * size,  0,
+		vv * size,  0,
+		ww * size,  0,
+		pos, 1
+	);
+}
+
+mat4 LookAtOptimized(float size, vec3 pos, vec3 direction) {
+	vec3 ww = -direction;
+	vec3 uu = normalize(vec3(ww.z, 0, -ww.x));
+	vec3 vv = normalize(vec3(ww.y*uu.z, ww.z*uu.x - ww.x*uu.z, -ww.y*uu.x));
+
+	// not sure whether correct
+	return mat4(
+		uu * size,  0,
+		vv * size,  0,
+		ww * size,  0,
 		pos, 1
 	);
 }
@@ -144,7 +159,7 @@ vec3 hsv2rgb(vec3 c)
 void main() {
 	float phase = mod(gl_InstanceID, 3.14);
 	
-	mat4 modelMatrix = LookAt(SIZE, InstancePosition, InstanceHeading);
+	mat4 modelMatrix = LookAtOptimized(SIZE, InstancePosition, InstanceHeading);
 	mat4 normalMatrix = transpose(inverse(CameraMatrix * modelMatrix));
 
 	float twistAmount = sin(-VertexPosition.z + phase + Time * SWIM_SPEED - SWIM_ROLL_OFFSET)*0.3;
@@ -155,13 +170,13 @@ void main() {
 	vec3 normal = normalize(Swim(VertexPosition + VertexNormal, twistRotation, wiggleAmount) - position);
 	
 	FragmentUV = VertexUV;
-	ScreenNormal = normalize(mat3(normalMatrix) * normal);
+	ScreenNormal = mat3(normalMatrix) * normal;
 	
 	vec4 fragmentPosition = modelMatrix * vec4(position, 1);
 	gl_Position = ProjectionCameraMatrix * fragmentPosition;
 
 	FragmentPosition = fragmentPosition.xyz;
-	FragmentColor = vec4(hsv2rgb(vec3(InstanceHue * 0.3, 0.8, 0.7)), 1);
+	FragmentColor = hsv2rgb(vec3(InstanceHue * 0.3, 0.8, 0.7));
 }
 ` + "\x00"
 
@@ -176,7 +191,7 @@ uniform vec3 DiffuseLightPosition;
 
 in vec3 FragmentPosition;
 in vec2 FragmentUV;
-in vec4 FragmentColor;
+in vec3 FragmentColor;
 
 in vec3 ScreenNormal;
 
@@ -190,7 +205,7 @@ void main() {
 
 	float diffuseShade = clamp(dot(normal, diffuseLightDirection), 0.0, 1.0);
 
-	vec4 albedo = vec4(1);
-	OutputColor = albedo * (ambientLight + diffuseShade) * FragmentColor;
+	vec4 albedo = texture(AlbedoTexture, FragmentUV);
+	OutputColor = albedo * (ambientLight + diffuseShade) * vec4(FragmentColor, 1);
 }
 ` + "\x00"
