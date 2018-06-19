@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/adinfinit/g"
@@ -174,34 +176,47 @@ func (boids *Boids) resizeCells() {
 func (boids *Boids) computeCells(world *World) {
 	defer bench("computeCells")()
 
-	cellIndex := int32(0)
-	for _, indices := range boids.CellHash {
-		alignment := g.Vec3{}
-		separation := g.Vec3{}
+	nextIndex := int32(0)
+	var wg sync.WaitGroup
+	wg.Add(*procs)
+	work := make(chan []int32, *procs)
 
-		for _, boidIndex := range indices {
-			boids.CellIndex[boidIndex] = cellIndex
-			alignment = alignment.Add(boids.Heading[boidIndex])
-			separation = separation.Add(boids.Position[boidIndex])
-		}
+	async.Spawn(*procs, func(int) {
+		defer wg.Done()
+		for indices := range work {
+			cellIndex := atomic.AddInt32(&nextIndex, 1) - 1
 
-		center := separation.Mul(1.0 / float32(len(indices)))
-		boids.CellAlignment[cellIndex] = alignment.Mul(1.0 / float32(len(indices)))
-		boids.CellSeparation[cellIndex] = center
+			alignment := g.Vec3{}
+			separation := g.Vec3{}
 
-		nearest := boids.Targets[0]
-		nearestDistance2 := center.Sub(boids.Targets[0]).Len2()
-		for _, target := range boids.Targets[1:] {
-			dist2 := center.Sub(target).Len2()
-			if dist2 < nearestDistance2 {
-				nearest = target
-				nearestDistance2 = dist2
+			for _, boidIndex := range indices {
+				boids.CellIndex[boidIndex] = cellIndex
+				alignment = alignment.Add(boids.Heading[boidIndex])
+				separation = separation.Add(boids.Position[boidIndex])
 			}
-		}
-		boids.CellTarget[cellIndex] = nearest
 
-		cellIndex++
+			center := separation.Mul(1.0 / float32(len(indices)))
+			boids.CellAlignment[cellIndex] = alignment.Mul(1.0 / float32(len(indices)))
+			boids.CellSeparation[cellIndex] = center
+
+			nearest := boids.Targets[0]
+			nearestDistance2 := center.Sub(boids.Targets[0]).Len2()
+			for _, target := range boids.Targets[1:] {
+				dist2 := center.Sub(target).Len2()
+				if dist2 < nearestDistance2 {
+					nearest = target
+					nearestDistance2 = dist2
+				}
+			}
+			boids.CellTarget[cellIndex] = nearest
+		}
+	})
+
+	for _, indices := range boids.CellHash {
+		work <- indices
 	}
+	close(work)
+	wg.Wait()
 }
 
 func check(t string, ps ...g.Vec3) {
