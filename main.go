@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strconv"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/adinfinit/g"
@@ -31,7 +32,8 @@ var (
 )
 
 const (
-	BoidsBatchSize = 100000
+	BoidsBatchSize = 1000000
+	HashThreads    = 2
 )
 
 type Boids struct {
@@ -51,7 +53,7 @@ type Boids struct {
 
 	Targets []g.Vec3
 
-	CellHash       map[int32][]int32
+	CellHash       [HashThreads]map[int32][]int32
 	CellIndices    [][]int32
 	CellTarget     []g.Vec3
 	CellAlignment  []g.Vec3
@@ -81,7 +83,9 @@ func (boids *Boids) randomize() {
 
 func (boids *Boids) initData() {
 	boids.GPUBoids = &GPUBoids{}
-	boids.CellHash = make(map[int32][]int32, BoidsBatchSize/10)
+	for i := range boids.CellHash {
+		boids.CellHash[i] = make(map[int32][]int32, BoidsBatchSize/10)
+	}
 
 	boids.Settings.CellRadius = 5
 	boids.Settings.SeparationWeight = 0.5
@@ -128,8 +132,10 @@ func (boids *Boids) Simulate(world *World) {
 
 	boids.Settings.TargetWeight = 1
 
-	for hash, list := range boids.CellHash {
-		boids.CellHash[hash] = list[:0]
+	for _, table := range boids.CellHash {
+		for hash, list := range table {
+			table[hash] = list[:0]
+		}
 	}
 
 	bench("---")()
@@ -142,37 +148,54 @@ func (boids *Boids) Simulate(world *World) {
 func (boids *Boids) hashPositions(radius float32) {
 	defer bench("hashPositions")()
 
-	invradius := 1 / radius
-	for i, p := range boids.Position {
-		x, y, z := int32(p.X*invradius), int32(p.Y*invradius), int32(p.Z*invradius)
+	index := int32(0)
+	async.BlockIter(len(boids.Position), HashThreads, func(start, limit int) {
+		tid := atomic.AddInt32(&index, 1) - 1
 
-		hash := x
-		hash += (hash * 397) ^ y
-		hash += (hash * 397) ^ z
-		hash += hash << 3
-		hash ^= hash >> 11
-		hash += hash << 15
+		cellhash := boids.CellHash[tid]
 
-		boids.CellHash[hash] = append(boids.CellHash[hash], int32(i))
+		invradius := 1 / radius
+		for offset, p := range boids.Position[start:limit] {
+			x, y, z := int32(p.X*invradius), int32(p.Y*invradius), int32(p.Z*invradius)
+
+			hash := x
+			hash += (hash * 397) ^ y
+			hash += (hash * 397) ^ z
+			hash += hash << 3
+			hash ^= hash >> 11
+			hash += hash << 15
+
+			cellhash[hash] = append(cellhash[hash], int32(start+offset))
+		}
+	})
+
+	merge := boids.CellHash[0]
+	for _, table := range boids.CellHash[1:] {
+		for hash, indices := range table {
+			merge[hash] = append(merge[hash], indices...)
+		}
 	}
 }
 
 func (boids *Boids) resizeCells() {
 	defer bench("resizeCells")()
-	if cap(boids.CellAlignment) < len(boids.CellHash) {
-		boids.CellAlignment = make([]g.Vec3, len(boids.CellHash))
-		boids.CellSeparation = make([]g.Vec3, len(boids.CellHash))
-		boids.CellTarget = make([]g.Vec3, len(boids.CellHash))
-		boids.CellIndices = make([][]int32, len(boids.CellHash))
+
+	cellCount := len(boids.CellHash[0])
+
+	if cap(boids.CellAlignment) < cellCount {
+		boids.CellAlignment = make([]g.Vec3, cellCount)
+		boids.CellSeparation = make([]g.Vec3, cellCount)
+		boids.CellTarget = make([]g.Vec3, cellCount)
+		boids.CellIndices = make([][]int32, cellCount)
 	}
 
-	boids.CellAlignment = boids.CellAlignment[:len(boids.CellHash)]
-	boids.CellSeparation = boids.CellSeparation[:len(boids.CellHash)]
-	boids.CellTarget = boids.CellTarget[:len(boids.CellHash)]
-	boids.CellIndices = boids.CellIndices[:len(boids.CellHash)]
+	boids.CellAlignment = boids.CellAlignment[:cellCount]
+	boids.CellSeparation = boids.CellSeparation[:cellCount]
+	boids.CellTarget = boids.CellTarget[:cellCount]
+	boids.CellIndices = boids.CellIndices[:cellCount]
 
 	nextIndex := 0
-	for _, indices := range boids.CellHash {
+	for _, indices := range boids.CellHash[0] {
 		boids.CellIndices[nextIndex] = indices
 		nextIndex++
 	}
