@@ -166,13 +166,13 @@ void main() {
 
 	vec3 position = Swim(VertexPosition, twistRotation, wiggleAmount);
 	vec3 normal = normalize(Swim(VertexPosition + VertexNormal, twistRotation, wiggleAmount) - position);
-	
+
 	vec4 fragmentPosition = modelMatrix * vec4(position, 1);
 	gl_Position = ProjectionCameraMatrix * fragmentPosition;
 
 	// lighting
-	vec3 albedo = hsv2rgb(vec3(InstanceHue * 0.3, 0.8, 0.7));
-	float ambientLight = 0.2;
+	vec3 albedo = vec3(InstanceHue);
+	float ambientLight = 0.3;
 	
 	vec3 screenNormal = normalize(mat3(normalMatrix) * normal);
 	vec3 diffuseLightDirection = normalize(DiffuseLightPosition - fragmentPosition.xyz);

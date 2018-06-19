@@ -385,7 +385,8 @@ func main() {
 	gl.Enable(gl.CULL_FACE)
 	gl.CullFace(gl.BACK)
 
-	gl.ClearColor(0x26/255.0, 0x42/255.0, 0x6b/255.0, 1.0)
+	// gl.ClearColor(0x26/255.0, 0x42/255.0, 0x6b/255.0, 1.0)
+	gl.ClearColor(0, 0, 0, 1.0)
 	log.Println("ERROR: ", gl.GetError())
 
 	angle := float32(0.0)

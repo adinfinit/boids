@@ -25,7 +25,7 @@ var sphere = Lathe(12, 12, true, func(t, phase float32) g.Vec3 {
 	)
 })
 
-var fish = Lathe(12, 12, true, func(t, phase float32) g.Vec3 {
+var fish = LatheWrap(7, 3, true, func(t, phase float32) g.Vec3 {
 	r := 12.291*t*t*t - 20*t*t + 8.508*t + 0.01
 	h := 3 * t
 	rx := 0.5*h*g.Exp(1-h) + 0.01
@@ -114,6 +114,68 @@ func (mesh *MeshData) WrapCylinder() {
 
 func (mesh *MeshData) Triangle(a, b, c int16) {
 	mesh.Indices = append(mesh.Indices, a, b, c)
+}
+
+func LatheWrap(depth, corners int, capped bool, fn func(t, phase float32) g.Vec3) MeshData {
+	mesh := MeshData{}
+
+	var headAverage g.Vec3
+	lastLayer, nextLayer := make([]int16, corners), make([]int16, corners)
+	for pi := 0; pi < corners; pi++ {
+		p := float32(pi) * g.Tau / float32(corners)
+		v := fn(0, p)
+		uv := g.V2(0, float32(pi)/float32(corners))
+		lastLayer[pi] = mesh.Vertex(v, uv)
+		if capped {
+			headAverage = headAverage.Add(v)
+		}
+	}
+
+	if capped {
+		headAverage = headAverage.Mul(1 / float32(corners))
+		z0 := mesh.Vertex(headAverage, g.V2(0, 0.5))
+		for pi := 0; pi < corners; pi++ {
+			a, b := lastLayer[pi], lastLayer[(pi+1)%corners]
+			mesh.Triangle(z0, a, b)
+		}
+	}
+
+	var tailAverage g.Vec3
+	for ti := 1; ti < depth; ti++ {
+		t := float32(ti) / float32(depth-1)
+		for pi := 0; pi < corners; pi++ {
+			p := float32(pi) * g.Tau / float32(corners)
+			v := fn(t, p)
+			uv := g.V2(float32(ti)/float32(depth), float32(pi)/float32(corners))
+			nextLayer[pi] = mesh.Vertex(v, uv)
+			if capped && ti == depth-1 {
+				tailAverage = tailAverage.Add(v)
+			}
+		}
+
+		for pi := 0; pi < corners; pi++ {
+			a, b := lastLayer[pi], lastLayer[(pi+1)%corners]
+			c, d := nextLayer[pi], nextLayer[(pi+1)%corners]
+			mesh.Triangle(a, c, d)
+			mesh.Triangle(a, d, b)
+		}
+
+		lastLayer, nextLayer = nextLayer, lastLayer
+	}
+
+	if capped {
+		tailAverage = tailAverage.Mul(1 / float32(corners))
+		uv := g.V2(1, 0.5)
+		zt := mesh.Vertex(tailAverage, uv)
+		for pi := 0; pi < corners; pi++ {
+			a, b := lastLayer[pi], lastLayer[(pi+1)%corners]
+			mesh.Triangle(a, zt, b)
+		}
+	}
+
+	mesh.RecalculateNormals()
+
+	return mesh
 }
 
 func Lathe(depth, corners int, capped bool, fn func(t, phase float32) g.Vec3) MeshData {
