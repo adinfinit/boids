@@ -129,11 +129,11 @@ mat4 LookAt(float size, vec3 pos, vec3 direction) {
 
 	// not sure whether correct
 	return mat4(
-		uu,  0,
-		vv,  0,
-		ww,  0,
+		uu * SIZE,  0,
+		vv * SIZE,  0,
+		ww * SIZE,  0,
 		pos, 1
-	) * scale(SIZE);
+	);
 }
 
 vec3 RotateZ(vec3 original, float alpha) {
