@@ -14,6 +14,7 @@ import (
 	"github.com/adinfinit/g"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
+	"github.com/loov/hrtime"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 20000
+	BoidsBatchSize = 50000
 )
 
 type Boids struct {
@@ -331,9 +332,12 @@ func main() {
 		world.NextFrameGLFW(window)
 
 		// Update
+		simStart := hrtime.Now()
 		boids.Simulate(world)
+		simStop := hrtime.Now()
 
 		// Render
+		renderStart := hrtime.Now()
 		gl.UseProgram(program)
 
 		gl.Uniform1f(timeUniform, float32(world.Time))
@@ -352,6 +356,9 @@ func main() {
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
 			int32(boids.Count()),
 		)
+		renderStop := hrtime.Now()
+
+		window.SetTitle(fmt.Sprintf("Sim:\t%v\tRender:\t%v", simStop-simStart, renderStop-renderStart))
 
 		// Maintenance
 		window.SwapBuffers()
