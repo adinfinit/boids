@@ -7,7 +7,9 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"os"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"unsafe"
 
@@ -18,6 +20,8 @@ import (
 )
 
 var (
+	cpuprofile = flag.String("cpuprofile", "", "profile")
+
 	windowWidth  = flag.Int("width", 800, "window width")
 	windowHeight = flag.Int("height", 600, "window height")
 )
@@ -254,16 +258,34 @@ const Mat4Size = 16 * 4
 func init() { runtime.LockOSThread() }
 
 func main() {
+	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatalf("unable to create cpu-profile %q: %v", *cpuprofile, err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatalf("unable to start cpu-profile: %v", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
 	}
 	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.Resizable, glfw.True)
+	glfw.WindowHint(glfw.Samples, 2)
+
 	glfw.WindowHint(glfw.ContextVersionMajor, 4)
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
+
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
+
 	window, err := glfw.CreateWindow(*windowWidth, *windowHeight, "Boids", nil, nil)
 	if err != nil {
 		log.Fatalln("failed to create window: ", err)
@@ -347,7 +369,7 @@ func main() {
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		angle += world.DeltaTime * 0.1
+		angle += world.DeltaTime * 0.3
 		sn, cs := g.Sincos(angle)
 		world.Camera.Eye.X = sn * 30.0
 		world.Camera.Eye.Z = cs * 30.0
