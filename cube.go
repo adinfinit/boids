@@ -25,7 +25,7 @@ var sphere = Lathe(12, 12, true, func(t, phase float32) g.Vec3 {
 	)
 })
 
-var fish = Lathe(5, 3, true, func(t, phase float32) g.Vec3 {
+var fish = Lathe(12, 12, true, func(t, phase float32) g.Vec3 {
 	r := 12.291*t*t*t - 20*t*t + 8.508*t + 0.01
 	h := 3 * t
 	rx := 0.5*h*g.Exp(1-h) + 0.01

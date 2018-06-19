@@ -94,7 +94,7 @@ func (boids *Boids) Simulate(world *World) {
 		0,
 		float32(cs)*10,
 	)
-	boids.Settings.TargetWeight = float32(math.Sin(world.Time*0.5)*0.3 + 0.3)
+	boids.Settings.TargetWeight = float32(math.Sin(world.Time*0.5)*0.25 + 0.5)
 
 	for hash := range boids.CellHash {
 		delete(boids.CellHash, hash)
@@ -142,14 +142,12 @@ func (boids *Boids) computeCells(world *World) {
 		}
 	}
 
-	for hash, indices := range boids.CellHash {
+	for _, indices := range boids.CellHash {
 		alignment := g.Vec3{}
 		separation := g.Vec3{}
 
-		cellHue := boids.CellHue[hash] * 0.01
 		for _, boidIndex := range indices {
 			boids.CellIndex[boidIndex] = cellIndex
-			boids.Hue[boidIndex] = boids.Hue[boidIndex]*0.999 + cellHue
 			alignment = alignment.Add(boids.Heading[boidIndex])
 			separation = separation.Add(boids.Position[boidIndex])
 		}

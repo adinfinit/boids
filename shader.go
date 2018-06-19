@@ -175,7 +175,7 @@ void main() {
 	gl_Position = ProjectionMatrix * CameraMatrix * modelMatrix * vec4(position, 1);
 
 	FragmentPosition = vec3(modelMatrix * vec4(position, 1));
-	FragmentColor = vec4(hsv2rgb(vec3(InstanceHue, 0.8, 0.7)), 1);
+	FragmentColor = vec4(hsv2rgb(vec3(InstanceHue * 0.3, 0.8, 0.7)), 1);
 }
 ` + "\x00"
 
@@ -196,15 +196,14 @@ in vec4 FragmentColor;
 out vec4 OutputColor;
 
 void main() {
-	float ambientLight = 0.1;
+	float ambientLight = 0.2;
 	
 	vec3 normal = normalize(FragmentNormal);
 	vec3 diffuseLightDirection = normalize(DiffuseLightPosition - FragmentPosition);
 
 	float diffuseShade = clamp(dot(normal, diffuseLightDirection), 0.0, 1.0);
 
-	vec4 albedo = texture(AlbedoTexture, FragmentUV);
-
+	vec4 albedo = vec4(1);
 	OutputColor = albedo * (ambientLight + diffuseShade) * FragmentColor;
 }
 ` + "\x00"
@@ -220,7 +219,6 @@ uniform mat4 CameraMatrix;
 in vec3 VertexPosition;
 in vec3 VertexNormal;
 in vec2 VertexUV;
-
 
 out VS_OUT {
 	vec3 FragmentNormal;
