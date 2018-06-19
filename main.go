@@ -11,8 +11,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strconv"
-	"sync"
-	"sync/atomic"
 	"unsafe"
 
 	"github.com/adinfinit/g"
@@ -54,6 +52,7 @@ type Boids struct {
 	Targets []g.Vec3
 
 	CellHash       map[int32][]int32
+	CellIndices    [][]int32
 	CellTarget     []g.Vec3
 	CellAlignment  []g.Vec3
 	CellSeparation []g.Vec3
@@ -162,61 +161,57 @@ func (boids *Boids) hashPositions(radius float32) {
 }
 
 func (boids *Boids) resizeCells() {
+	defer bench("resizeCells")()
 	if cap(boids.CellAlignment) < len(boids.CellHash) {
 		boids.CellAlignment = make([]g.Vec3, len(boids.CellHash))
 		boids.CellSeparation = make([]g.Vec3, len(boids.CellHash))
 		boids.CellTarget = make([]g.Vec3, len(boids.CellHash))
+		boids.CellIndices = make([][]int32, len(boids.CellHash))
 	}
 
 	boids.CellAlignment = boids.CellAlignment[:len(boids.CellHash)]
 	boids.CellSeparation = boids.CellSeparation[:len(boids.CellHash)]
-	boids.CellTarget = make([]g.Vec3, len(boids.CellHash))
+	boids.CellTarget = boids.CellTarget[:len(boids.CellHash)]
+	boids.CellIndices = boids.CellIndices[:len(boids.CellHash)]
+
+	nextIndex := 0
+	for _, indices := range boids.CellHash {
+		boids.CellIndices[nextIndex] = indices
+		nextIndex++
+	}
 }
 
 func (boids *Boids) computeCells(world *World) {
 	defer bench("computeCells")()
 
-	nextIndex := int32(0)
-	var wg sync.WaitGroup
-	wg.Add(*procs)
-	work := make(chan []int32, *procs)
+	async.Iter(len(boids.CellIndices), *procs, func(cellIndex int) {
+		indices := boids.CellIndices[cellIndex]
 
-	async.Spawn(*procs, func(int) {
-		defer wg.Done()
-		for indices := range work {
-			cellIndex := atomic.AddInt32(&nextIndex, 1) - 1
+		alignment := g.Vec3{}
+		separation := g.Vec3{}
 
-			alignment := g.Vec3{}
-			separation := g.Vec3{}
-
-			for _, boidIndex := range indices {
-				boids.CellIndex[boidIndex] = cellIndex
-				alignment = alignment.Add(boids.Heading[boidIndex])
-				separation = separation.Add(boids.Position[boidIndex])
-			}
-
-			center := separation.Mul(1.0 / float32(len(indices)))
-			boids.CellAlignment[cellIndex] = alignment.Mul(1.0 / float32(len(indices)))
-			boids.CellSeparation[cellIndex] = center
-
-			nearest := boids.Targets[0]
-			nearestDistance2 := center.Sub(boids.Targets[0]).Len2()
-			for _, target := range boids.Targets[1:] {
-				dist2 := center.Sub(target).Len2()
-				if dist2 < nearestDistance2 {
-					nearest = target
-					nearestDistance2 = dist2
-				}
-			}
-			boids.CellTarget[cellIndex] = nearest
+		for _, boidIndex := range indices {
+			boids.CellIndex[boidIndex] = int32(cellIndex)
+			alignment = alignment.Add(boids.Heading[boidIndex])
+			separation = separation.Add(boids.Position[boidIndex])
 		}
-	})
 
-	for _, indices := range boids.CellHash {
-		work <- indices
-	}
-	close(work)
-	wg.Wait()
+		byCount := 1.0 / float32(len(indices))
+		center := separation.Mul(byCount)
+		boids.CellAlignment[cellIndex] = alignment.Mul(byCount)
+		boids.CellSeparation[cellIndex] = center
+
+		nearest := boids.Targets[0]
+		nearestDistance2 := center.Sub(boids.Targets[0]).Len2()
+		for _, target := range boids.Targets[1:] {
+			dist2 := center.Sub(target).Len2()
+			if dist2 < nearestDistance2 {
+				nearest = target
+				nearestDistance2 = dist2
+			}
+		}
+		boids.CellTarget[cellIndex] = nearest
+	})
 }
 
 func check(t string, ps ...g.Vec3) {
