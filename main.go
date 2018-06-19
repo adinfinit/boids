@@ -45,7 +45,7 @@ type Boids struct {
 
 	Speed [BoidsBatchSize]float32
 
-	CellID         map[int32]int32
+	CellHue        map[int32]float32
 	CellHash       map[int32][]int32
 	CellIndex      [BoidsBatchSize]int32
 	CellAlignment  []g.Vec3
@@ -77,7 +77,7 @@ func (boids *Boids) randomize() {
 
 func (boids *Boids) initData() {
 	// boids.GPUBoids = &GPUBoids{}
-	boids.CellID = make(map[int32]int32, BoidsBatchSize/10)
+	boids.CellHue = make(map[int32]float32, BoidsBatchSize/10)
 	boids.CellHash = make(map[int32][]int32, BoidsBatchSize/10)
 
 	boids.Settings.CellRadius = 5
@@ -136,9 +136,9 @@ func (boids *Boids) resizeCells() {
 func (boids *Boids) computeCells(world *World) {
 	cellIndex := int32(0)
 	for hash := range boids.CellHash {
-		_, ok := boids.CellID[hash]
+		_, ok := boids.CellHue[hash]
 		if !ok {
-			boids.CellID[hash] = int32(len(boids.CellID))
+			boids.CellHue[hash] = g.Mod(float32(len(boids.CellHue))*g.Phi/g.Tau, 1)
 		}
 	}
 
@@ -146,10 +146,10 @@ func (boids *Boids) computeCells(world *World) {
 		alignment := g.Vec3{}
 		separation := g.Vec3{}
 
-		cellHue := float32(boids.CellID[hash]) * 0.1 / float32(len(boids.CellID))
+		cellHue := boids.CellHue[hash] * 0.01
 		for _, boidIndex := range indices {
 			boids.CellIndex[boidIndex] = cellIndex
-			boids.Hue[boidIndex] = boids.Hue[boidIndex]*0.9 + cellHue
+			boids.Hue[boidIndex] = boids.Hue[boidIndex]*0.999 + cellHue
 			alignment = alignment.Add(boids.Heading[boidIndex])
 			separation = separation.Add(boids.Position[boidIndex])
 		}
@@ -366,12 +366,12 @@ func main() {
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		angle += world.DeltaTime * 0.3
+		angle += world.DeltaTime * 0
 		sn, cs := g.Sincos(angle)
 		world.Camera.Eye.X = sn * 30.0
 		world.Camera.Eye.Z = cs * 30.0
 
-		world.DiffuseLightPosition = boids.Settings.Target
+		world.DiffuseLightPosition = g.Z3
 
 		world.NextFrameGLFW(window)
 
