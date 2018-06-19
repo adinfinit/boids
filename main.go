@@ -50,7 +50,6 @@ type Boids struct {
 	CellIndex      [BoidsBatchSize]int32
 	CellAlignment  []g.Vec3
 	CellSeparation []g.Vec3
-	CellCount      []int32
 }
 
 type GPUBoids struct {
@@ -128,12 +127,10 @@ func (boids *Boids) resizeCells() {
 	if cap(boids.CellAlignment) < len(boids.CellHash) {
 		boids.CellAlignment = make([]g.Vec3, len(boids.CellHash))
 		boids.CellSeparation = make([]g.Vec3, len(boids.CellHash))
-		boids.CellCount = make([]int32, len(boids.CellHash))
 	}
 
 	boids.CellAlignment = boids.CellAlignment[:len(boids.CellHash)]
 	boids.CellSeparation = boids.CellSeparation[:len(boids.CellHash)]
-	boids.CellCount = boids.CellCount[:len(boids.CellHash)]
 }
 
 func (boids *Boids) computeCells(world *World) {
@@ -185,6 +182,7 @@ func safeNormalize(v g.Vec3, s float32) g.Vec3 {
 func (boids *Boids) steer(world *World) {
 	dt := world.DeltaTime
 	targetPosition := boids.Settings.Target
+
 	for i := range boids.Position {
 		cell := boids.CellIndex[i]
 		pos := boids.Position[i]
@@ -195,7 +193,6 @@ func (boids *Boids) steer(world *World) {
 		target := safeNormalize(targetPosition.Sub(pos), boids.Settings.TargetWeight)
 
 		normalHeading := safeNormalize(alignment.Add(separation).Add(target), 1)
-
 		boids.Heading[i] = safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
 	}
 }
