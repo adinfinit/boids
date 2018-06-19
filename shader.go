@@ -185,8 +185,6 @@ var fragmentShader = `
 
 const float TAU = 2.0 * 3.14;
 
-uniform sampler2D AlbedoTexture;
-
 uniform vec3 DiffuseLightPosition;
 
 in vec3 FragmentPosition;
@@ -205,7 +203,7 @@ void main() {
 
 	float diffuseShade = clamp(dot(normal, diffuseLightDirection), 0.0, 1.0);
 
-	vec4 albedo = texture(AlbedoTexture, FragmentUV);
-	OutputColor = albedo * (ambientLight + diffuseShade) * vec4(FragmentColor, 1);
+	vec4 albedo = vec4(FragmentColor, 1);
+	OutputColor = albedo * (ambientLight + diffuseShade);
 }
 ` + "\x00"

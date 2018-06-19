@@ -341,17 +341,10 @@ func main() {
 	projectionUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(boidProgram, gl.Str("CameraMatrix\x00"))
 	projectionCameraUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionCameraMatrix\x00"))
-	textureUniform := gl.GetUniformLocation(boidProgram, gl.Str("AlbedoTexture\x00"))
-	gl.Uniform1i(textureUniform, 0)
 
 	diffuseLightPositionUniform := gl.GetUniformLocation(boidProgram, gl.Str("DiffuseLightPosition\x00"))
 
 	gl.BindFragDataLocation(boidProgram, 0, gl.Str("OutputColor\x00"))
-
-	texture, err := LoadTexture("fish.png")
-	if err != nil {
-		log.Fatalln(err)
-	}
 
 	mesh := defaultMesh
 
@@ -425,9 +418,6 @@ func main() {
 		gl.Uniform3fv(diffuseLightPositionUniform, 1, world.DiffuseLightPosition.Ptr())
 
 		gl.BindVertexArray(meshVAO)
-
-		gl.ActiveTexture(gl.TEXTURE0)
-		gl.BindTexture(gl.TEXTURE_2D, texture.ID)
 
 		gl.DrawElementsInstanced(
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
