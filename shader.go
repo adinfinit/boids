@@ -98,9 +98,9 @@ out vec4 FragmentColor;
 
 out float FragmentOrient;
 
-#define SWIM_SPEED 4
-#define SWIM_ROLL_OFFSET 0.7
-#define SIZE 0.2
+const float SWIM_SPEED = 4;
+const float SWIM_ROLL_OFFSET = 0.7;
+const float SIZE = 0.2;
 
 mat4 scale(float size) {
 	return mat4(
@@ -183,15 +183,6 @@ var fragmentShader = `
 #version 330
 
 const float TAU = 2.0 * 3.14;
-
-const float IRI_NOISE_INTENSITY        = 4.0;
-const float IRI_GAMMA = 0.9;
-const float IRI_CURVE = 0.0;
-
-const vec3  IRI_ORIENTATION_FREQUENCY  = vec3(1.0, 1.0, 1.0);
-const vec3  IRI_ORIENTATION_OFFSET     = vec3(0.0, 0.0, 0.0);
-const vec3  IRI_NOISE_FREQUENCY        = vec3(1.0, 1.0, 1.0);
-const vec3  IRI_NOISE_OFFSET           = vec3(0.0, 0.0, 0.0);
 
 uniform sampler2D AlbedoTexture;
 
