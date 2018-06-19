@@ -81,8 +81,8 @@ var vertexShader = `
 uniform float Time;
 
 uniform mat4 ProjectionMatrix;
-uniform mat4 CameraMatrix;
-uniform mat4 ProjectionCameraMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionViewMatrix;
 
 uniform vec3 DiffuseLightPosition;
 
@@ -157,7 +157,7 @@ void main() {
 	float phase = mod(gl_InstanceID, 3.14);
 	
 	mat4 modelMatrix = LookAtOptimized(SIZE, InstancePosition, InstanceHeading);
-	mat4 normalMatrix = transpose(inverse(CameraMatrix * modelMatrix));
+	mat4 normalMatrix = transpose(inverse(ViewMatrix * modelMatrix));
 
 	float twistAmount = sin(-VertexPosition.z + phase + Time * SWIM_SPEED - SWIM_ROLL_OFFSET)*0.3;
 	float wiggleAmount = sin(Time * SWIM_SPEED - VertexPosition.z + phase) * 0.2;
@@ -167,7 +167,7 @@ void main() {
 	vec3 normal = normalize(Swim(VertexPosition + VertexNormal, twistRotation, wiggleAmount) - position);
 
 	vec4 fragmentPosition = modelMatrix * vec4(position, 1);
-	gl_Position = ProjectionCameraMatrix * fragmentPosition;
+	gl_Position = ProjectionViewMatrix * fragmentPosition;
 
 	// lighting
 	float hue = mod(gl_InstanceID * 0.011111, 1);

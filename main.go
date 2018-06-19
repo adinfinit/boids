@@ -383,8 +383,8 @@ func main() {
 
 	timeUniform := gl.GetUniformLocation(boidProgram, gl.Str("Time\x00"))
 	projectionUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionMatrix\x00"))
-	cameraUniform := gl.GetUniformLocation(boidProgram, gl.Str("CameraMatrix\x00"))
-	projectionCameraUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionCameraMatrix\x00"))
+	viewUniform := gl.GetUniformLocation(boidProgram, gl.Str("ViewMatrix\x00"))
+	projectionViewUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionViewMatrix\x00"))
 
 	diffuseLightPositionUniform := gl.GetUniformLocation(boidProgram, gl.Str("DiffuseLightPosition\x00"))
 
@@ -458,8 +458,8 @@ func main() {
 
 		gl.Uniform1f(timeUniform, float32(world.Time))
 		gl.UniformMatrix4fv(projectionUniform, 1, false, world.Camera.Projection.Ptr())
-		gl.UniformMatrix4fv(cameraUniform, 1, false, world.Camera.Camera.Ptr())
-		gl.UniformMatrix4fv(projectionCameraUniform, 1, false, world.Camera.ProjectionCamera.Ptr())
+		gl.UniformMatrix4fv(viewUniform, 1, false, world.Camera.View.Ptr())
+		gl.UniformMatrix4fv(projectionViewUniform, 1, false, world.Camera.ProjectionView.Ptr())
 		gl.Uniform3fv(diffuseLightPositionUniform, 1, world.DiffuseLightPosition.Ptr())
 
 		gl.BindVertexArray(meshVAO)
@@ -525,9 +525,9 @@ type Camera struct {
 	FOV       float32
 	Near, Far float32
 
-	Projection       g.Mat4
-	Camera           g.Mat4
-	ProjectionCamera g.Mat4
+	Projection     g.Mat4
+	View           g.Mat4
+	ProjectionView g.Mat4
 }
 
 func NewCamera() *Camera {
@@ -541,7 +541,6 @@ func NewCamera() *Camera {
 
 func (camera *Camera) UpdateScreenSize(size g.Vec2) {
 	camera.Projection = g.Perspective(g.DegToRad(camera.FOV), size.X/size.Y, 0.1, 100.0)
-	camera.Camera = g.LookAtV(camera.Eye, camera.LookAt, camera.Up)
-
-	camera.ProjectionCamera = camera.Projection.Mul4(camera.Camera)
+	camera.View = g.LookAtV(camera.Eye, camera.LookAt, camera.Up)
+	camera.ProjectionView = camera.Projection.Mul4(camera.View)
 }
