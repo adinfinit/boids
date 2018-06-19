@@ -77,7 +77,7 @@ func (boids *Boids) randomize() {
 			rand.Float32()-0.5,
 			rand.Float32()-0.5,
 		).Normalize()
-		boids.Speed[i] = 5
+		boids.Speed[i] = 3 + rand.Float32()*3
 	}
 }
 
