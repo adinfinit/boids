@@ -16,6 +16,8 @@ import (
 	"github.com/adinfinit/g"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
+
+	"github.com/egonelbre/async"
 	"github.com/loov/hrtime"
 )
 
@@ -24,6 +26,8 @@ var (
 
 	windowWidth  = flag.Int("width", 800, "window width")
 	windowHeight = flag.Int("height", 600, "window height")
+
+	procs = flag.Int("p", runtime.GOMAXPROCS(-1), "parallelism")
 )
 
 const (
@@ -129,6 +133,7 @@ func (boids *Boids) Simulate(world *World) {
 		delete(boids.CellHash, hash)
 	}
 
+	bench("---")()
 	boids.hashPositions(boids.Settings.CellRadius)
 	boids.resizeCells()
 	boids.computeCells(world)
@@ -209,35 +214,36 @@ func check(t string, ps ...g.Vec3) {
 }
 
 func safeNormalize(v g.Vec3, s float32) g.Vec3 {
-	l := v.Len()
+	l := v.Len2()
 	if l < 1e-3 {
 		return g.V3(0, 0, s)
-		//return (g.Vec3{rand.Float32() - 0.5, rand.Float32() - 0.5, rand.Float32() - 0.5}).Normalize()
 	}
-	return v.Mul(s / l)
+	return v.Mul(s / g.Sqrt(l))
 }
 
 func (boids *Boids) steer(world *World) {
 	defer bench("steer")()
 	dt := world.DeltaTime
 
-	// async.BlockIter(len, boids.Position, )
-	for i := range boids.Position {
-		cell := boids.CellIndex[i]
-		pos := boids.Position[i]
-		head := boids.Heading[i]
+	async.BlockIter(len(boids.Position), *procs, func(start, limit int) {
+		for offset := range boids.Position[start:limit] {
+			i := start + offset
+			cell := boids.CellIndex[i]
+			pos := boids.Position[i]
+			head := boids.Heading[i]
 
-		cellSeparation := boids.CellSeparation[cell]
-		cellAlignment := boids.CellAlignment[cell]
-		cellTarget := boids.CellTarget[cell]
+			cellSeparation := boids.CellSeparation[cell]
+			cellAlignment := boids.CellAlignment[cell]
+			cellTarget := boids.CellTarget[cell]
 
-		alignment := safeNormalize(cellAlignment.Sub(head), boids.Settings.AlignmentWeight)
-		separation := safeNormalize(pos.Sub(cellSeparation), boids.Settings.SeparationWeight)
-		target := safeNormalize(cellTarget.Sub(pos), boids.Settings.TargetWeight)
+			alignment := safeNormalize(cellAlignment.Sub(head), boids.Settings.AlignmentWeight)
+			separation := safeNormalize(pos.Sub(cellSeparation), boids.Settings.SeparationWeight)
+			target := safeNormalize(cellTarget.Sub(pos), boids.Settings.TargetWeight)
 
-		normalHeading := safeNormalize(alignment.Add(separation).Add(target), 1)
-		boids.Heading[i] = safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
-	}
+			normalHeading := safeNormalize(alignment.Add(separation).Add(target), 1)
+			boids.Heading[i] = safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
+		}
+	})
 }
 
 func (boids *Boids) moveForward(world *World) {
