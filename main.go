@@ -27,7 +27,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 50000
+	BoidsBatchSize = 200000
 )
 
 type Boids struct {
@@ -48,7 +48,6 @@ type Boids struct {
 	Targets []g.Vec3
 
 	CellHash       map[int32][]int32
-	CellHue        map[int32]float32
 	CellTarget     []g.Vec3
 	CellAlignment  []g.Vec3
 	CellSeparation []g.Vec3
@@ -79,7 +78,6 @@ func (boids *Boids) randomize() {
 
 func (boids *Boids) initData() {
 	boids.GPUBoids = &GPUBoids{}
-	boids.CellHue = make(map[int32]float32, BoidsBatchSize/10)
 	boids.CellHash = make(map[int32][]int32, BoidsBatchSize/10)
 
 	boids.Settings.CellRadius = 5
@@ -90,7 +88,21 @@ func (boids *Boids) initData() {
 	boids.Targets = []g.Vec3{{}, {}, {}}
 }
 
+var frame int
+
+func bench(name string) func() {
+	start := hrtime.TSC()
+	return func() {
+		stop := hrtime.TSC()
+		if frame%100 == 0 {
+			fmt.Printf("%-15s: %v\n", name, (stop - start).ApproxDuration())
+		}
+	}
+}
+
 func (boids *Boids) Simulate(world *World) {
+	frame++
+
 	sn, cs := math.Sincos(float64(world.Time * 0.1))
 
 	boids.Targets[0] = g.V3(
@@ -125,9 +137,11 @@ func (boids *Boids) Simulate(world *World) {
 }
 
 func (boids *Boids) hashPositions(radius float32) {
-	for i, pos := range boids.Position {
-		p := pos.Mul(1 / radius)
-		x, y, z := int32(p.X), int32(p.Y), int32(p.Z)
+	defer bench("hashPositions")()
+
+	invradius := 1 / radius
+	for i, p := range boids.Position {
+		x, y, z := int32(p.X*invradius), int32(p.Y*invradius), int32(p.Z*invradius)
 
 		hash := x
 		hash += (hash * 397) ^ y
@@ -153,14 +167,9 @@ func (boids *Boids) resizeCells() {
 }
 
 func (boids *Boids) computeCells(world *World) {
-	cellIndex := int32(0)
-	for hash := range boids.CellHash {
-		_, ok := boids.CellHue[hash]
-		if !ok {
-			boids.CellHue[hash] = g.Mod(float32(len(boids.CellHue))*g.Phi/g.Tau, 1)
-		}
-	}
+	defer bench("computeCells")()
 
+	cellIndex := int32(0)
 	for _, indices := range boids.CellHash {
 		alignment := g.Vec3{}
 		separation := g.Vec3{}
@@ -209,8 +218,10 @@ func safeNormalize(v g.Vec3, s float32) g.Vec3 {
 }
 
 func (boids *Boids) steer(world *World) {
+	defer bench("steer")()
 	dt := world.DeltaTime
 
+	// async.BlockIter(len, boids.Position, )
 	for i := range boids.Position {
 		cell := boids.CellIndex[i]
 		pos := boids.Position[i]
@@ -230,6 +241,8 @@ func (boids *Boids) steer(world *World) {
 }
 
 func (boids *Boids) moveForward(world *World) {
+	defer bench("moveForward")()
+
 	dt := world.DeltaTime
 	for i, prev := range boids.Position {
 		head := boids.Heading[i]
@@ -424,7 +437,7 @@ func main() {
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
 			int32(boids.Count()),
 		)
-		gl.Finish()
+		// gl.Finish()
 
 		renderStop := hrtime.Now()
 
