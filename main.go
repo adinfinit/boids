@@ -41,6 +41,7 @@ type Boids struct {
 
 	Speed [BoidsBatchSize]float32
 
+	CellID         map[int32]int32
 	CellHash       map[int32][]int32
 	CellIndex      [BoidsBatchSize]int32
 	CellAlignment  []g.Vec3
@@ -51,9 +52,7 @@ type Boids struct {
 type GPUBoids struct {
 	Position [BoidsBatchSize]g.Vec3
 	Heading  [BoidsBatchSize]g.Vec3
-	_static  struct{}
-	Color    [BoidsBatchSize]g.Color
-	// Matrix  [BoidsBatchSize]g.Mat4
+	Hue      [BoidsBatchSize]float32
 }
 
 func (boids *Boids) randomize() {
@@ -69,12 +68,13 @@ func (boids *Boids) randomize() {
 			rand.Float32()-0.5,
 		).Normalize()
 		boids.Speed[i] = 5
-		boids.Color[i] = g.HSL(rand.Float32()*0.3+0.3, 0.8, 0.8)
+		boids.Hue[i] = rand.Float32()
 	}
 }
 
 func (boids *Boids) initData() {
 	// boids.GPUBoids = &GPUBoids{}
+	boids.CellID = make(map[int32]int32, BoidsBatchSize/10)
 	boids.CellHash = make(map[int32][]int32, BoidsBatchSize/10)
 
 	boids.Settings.CellRadius = 5
@@ -134,12 +134,21 @@ func (boids *Boids) resizeCells() {
 
 func (boids *Boids) computeCells(world *World) {
 	cellIndex := int32(0)
-	for _, indices := range boids.CellHash {
+	for hash := range boids.CellHash {
+		_, ok := boids.CellID[hash]
+		if !ok {
+			boids.CellID[hash] = int32(len(boids.CellID))
+		}
+	}
+
+	for hash, indices := range boids.CellHash {
 		alignment := g.Vec3{}
 		separation := g.Vec3{}
 
+		cellHue := float32(boids.CellID[hash]) * 0.1 / float32(len(boids.CellID))
 		for _, boidIndex := range indices {
 			boids.CellIndex[boidIndex] = cellIndex
+			boids.Hue[boidIndex] = boids.Hue[boidIndex]*0.9 + cellHue
 			alignment = alignment.Add(boids.Heading[boidIndex])
 			separation = separation.Add(boids.Position[boidIndex])
 		}
@@ -201,10 +210,6 @@ func (boids *Boids) Count() int { return BoidsBatchSize }
 func (boids *Boids) size() int {
 	return int(unsafe.Sizeof(boids.GPUBoids))
 }
-func (boids *Boids) dynamicSize() int {
-	return int(unsafe.Offsetof(boids._static))
-}
-
 func (boids *Boids) Init(program uint32) {
 	boids.initData()
 	boids.randomize()
@@ -215,7 +220,7 @@ func (boids *Boids) Init(program uint32) {
 
 	boids.attribVec3(program, "InstancePosition", unsafe.Offsetof(boids.GPUBoids.Position))
 	boids.attribVec3(program, "InstanceHeading", unsafe.Offsetof(boids.GPUBoids.Heading))
-	boids.attribRGBA8(program, "InstanceColor", unsafe.Offsetof(boids.GPUBoids.Color))
+	boids.attribFloat(program, "InstanceHue", unsafe.Offsetof(boids.GPUBoids.Hue))
 }
 
 func (boids *Boids) attribVec3(program uint32, name string, offset uintptr) {
@@ -232,9 +237,16 @@ func (boids *Boids) attribRGBA8(program uint32, name string, offset uintptr) {
 	gl.VertexAttribDivisor(attrib, 1)
 }
 
+func (boids *Boids) attribFloat(program uint32, name string, offset uintptr) {
+	attrib := uint32(gl.GetAttribLocation(program, gl.Str(name+"\x00")))
+	gl.EnableVertexAttribArray(attrib)
+	gl.VertexAttribPointer(attrib, 1, gl.FLOAT, false, 4, unsafe.Pointer(offset))
+	gl.VertexAttribDivisor(attrib, 1)
+}
+
 func (boids *Boids) Upload() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
-	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.dynamicSize(), unsafe.Pointer(&boids.GPUBoids))
+	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.size(), unsafe.Pointer(&boids.GPUBoids))
 }
 
 const Mat4Size = 16 * 4
