@@ -383,13 +383,9 @@ func main() {
 		boids.Simulate(world)
 		simStop := hrtime.Now()
 
-		// Upload
-		uploadStart := hrtime.Now()
-		boids.Upload()
-		uploadStop := hrtime.Now()
-
-		// Render
+		// Rendering
 		renderStart := hrtime.Now()
+		boids.Upload()
 
 		gl.UseProgram(boidProgram)
 
@@ -410,7 +406,7 @@ func main() {
 
 		renderStop := hrtime.Now()
 
-		window.SetTitle(fmt.Sprintf("Sim:\t%v\tUpload:\t%v\tRender:\t%v", simStop-simStart, uploadStop-uploadStart, renderStop-renderStart))
+		window.SetTitle(fmt.Sprintf("Sim:\t%v\tRender:\t%v", simStop-simStart, renderStop-renderStart))
 
 		// Maintenance
 		window.SwapBuffers()
