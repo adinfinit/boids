@@ -102,24 +102,6 @@ const float SWIM_SPEED = 4;
 const float SWIM_ROLL_OFFSET = 0.7;
 const float SIZE = 0.2;
 
-mat4 scale(float size) {
-	return mat4(
-		size, 0, 0, 0,
-		0, size, 0, 0,
-		0, 0, size, 0,
-		0, 0, 0, 1
-	);
-}
-
-mat4 Translate(vec3 pos) {
-	return mat4(
-		SIZE, 0, 0, 0,
-		0, SIZE, 0, 0,
-		0, 0, SIZE, 0,
-		pos, 1
-	);
-}
-
 mat4 LookAt(float size, vec3 pos, vec3 direction) {
 	vec3 up = vec3(0, 1, 0);
 
