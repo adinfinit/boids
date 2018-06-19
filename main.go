@@ -37,17 +37,19 @@ type Boids struct {
 		CellRadius       float32
 		SeparationWeight float32
 		AlignmentWeight  float32
-		Target           g.Vec3
 		TargetWeight     float32
 	}
 
 	*GPUBoids
 
-	Speed [BoidsBatchSize]float32
+	Speed     [BoidsBatchSize]float32
+	CellIndex [BoidsBatchSize]int32
 
-	CellHue        map[int32]float32
+	Targets []g.Vec3
+
 	CellHash       map[int32][]int32
-	CellIndex      [BoidsBatchSize]int32
+	CellHue        map[int32]float32
+	CellTarget     []g.Vec3
 	CellAlignment  []g.Vec3
 	CellSeparation []g.Vec3
 }
@@ -82,19 +84,34 @@ func (boids *Boids) initData() {
 
 	boids.Settings.CellRadius = 5
 	boids.Settings.SeparationWeight = 0.5
-	boids.Settings.AlignmentWeight = 0.5
-	boids.Settings.Target = g.Vec3{}
+	boids.Settings.AlignmentWeight = 1
 	boids.Settings.TargetWeight = 0.5
+
+	boids.Targets = []g.Vec3{{}, {}, {}}
 }
 
 func (boids *Boids) Simulate(world *World) {
-	sn, cs := math.Sincos(float64(world.Time))
-	boids.Settings.Target = g.V3(
-		float32(sn)*10,
+	sn, cs := math.Sincos(float64(world.Time * 0.1))
+
+	boids.Targets[0] = g.V3(
 		0,
-		float32(cs)*10,
+		float32(cs)*20,
+		float32(sn)*20,
 	)
-	boids.Settings.TargetWeight = float32(math.Sin(world.Time*0.5)*0.25 + 0.5)
+
+	boids.Targets[1] = g.V3(
+		float32(sn)*25,
+		0,
+		float32(cs)*25,
+	)
+
+	boids.Targets[2] = g.V3(
+		-float32(cs)*30,
+		float32(sn)*30,
+		0,
+	)
+
+	boids.Settings.TargetWeight = 1
 
 	for hash := range boids.CellHash {
 		delete(boids.CellHash, hash)
@@ -127,10 +144,12 @@ func (boids *Boids) resizeCells() {
 	if cap(boids.CellAlignment) < len(boids.CellHash) {
 		boids.CellAlignment = make([]g.Vec3, len(boids.CellHash))
 		boids.CellSeparation = make([]g.Vec3, len(boids.CellHash))
+		boids.CellTarget = make([]g.Vec3, len(boids.CellHash))
 	}
 
 	boids.CellAlignment = boids.CellAlignment[:len(boids.CellHash)]
 	boids.CellSeparation = boids.CellSeparation[:len(boids.CellHash)]
+	boids.CellTarget = make([]g.Vec3, len(boids.CellHash))
 }
 
 func (boids *Boids) computeCells(world *World) {
@@ -152,8 +171,20 @@ func (boids *Boids) computeCells(world *World) {
 			separation = separation.Add(boids.Position[boidIndex])
 		}
 
+		center := separation.Mul(1.0 / float32(len(indices)))
 		boids.CellAlignment[cellIndex] = alignment.Mul(1.0 / float32(len(indices)))
-		boids.CellSeparation[cellIndex] = separation.Mul(1.0 / float32(len(indices)))
+		boids.CellSeparation[cellIndex] = center
+
+		nearest := boids.Targets[0]
+		nearestDistance2 := center.Sub(boids.Targets[0]).Len2()
+		for _, target := range boids.Targets[1:] {
+			dist2 := center.Sub(target).Len2()
+			if dist2 < nearestDistance2 {
+				nearest = target
+				nearestDistance2 = dist2
+			}
+		}
+		boids.CellTarget[cellIndex] = nearest
 
 		cellIndex++
 	}
@@ -179,16 +210,19 @@ func safeNormalize(v g.Vec3, s float32) g.Vec3 {
 
 func (boids *Boids) steer(world *World) {
 	dt := world.DeltaTime
-	targetPosition := boids.Settings.Target
 
 	for i := range boids.Position {
 		cell := boids.CellIndex[i]
 		pos := boids.Position[i]
 		head := boids.Heading[i]
 
-		alignment := safeNormalize(boids.CellAlignment[cell].Sub(head), boids.Settings.AlignmentWeight)
-		separation := safeNormalize(pos.Sub(boids.CellSeparation[cell]), boids.Settings.SeparationWeight)
-		target := safeNormalize(targetPosition.Sub(pos), boids.Settings.TargetWeight)
+		cellSeparation := boids.CellSeparation[cell]
+		cellAlignment := boids.CellAlignment[cell]
+		cellTarget := boids.CellTarget[cell]
+
+		alignment := safeNormalize(cellAlignment.Sub(head), boids.Settings.AlignmentWeight)
+		separation := safeNormalize(pos.Sub(cellSeparation), boids.Settings.SeparationWeight)
+		target := safeNormalize(cellTarget.Sub(pos), boids.Settings.TargetWeight)
 
 		normalHeading := safeNormalize(alignment.Add(separation).Add(target), 1)
 		boids.Heading[i] = safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
@@ -273,7 +307,7 @@ func main() {
 	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.Resizable, glfw.True)
-	glfw.WindowHint(glfw.Samples, 0)
+	glfw.WindowHint(glfw.Samples, 2)
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 4)
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)

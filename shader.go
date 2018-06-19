@@ -118,18 +118,21 @@ mat4 LookAt(float size, vec3 pos, vec3 direction) {
 	);
 }
 
-vec3 RotateZ(vec3 original, float alpha) {
+vec3 RotateZ(vec3 original, vec2 twistRotation) {
 	float sn, cs;
-	sn = sin(alpha);
-	cs = cos(alpha);
-	mat2 m = mat2(cs, -sn, sn, cs);
-	return vec3(m * original.xy, original.z);
+	sn = twistRotation.x;
+	cs = twistRotation.y;
+
+	vec3 r = original;
+	r.x = original.x * cs - original.y * sn;
+	r.y = original.x * sn + original.y * cs;
+	return r;
 }
 
-vec3 Swim(vec3 original, float phase) {
-	original = RotateZ(original, sin(-original.z + phase + Time * SWIM_SPEED - SWIM_ROLL_OFFSET)*0.5);
+vec3 Swim(vec3 original, vec2 twistRotation, float wiggleAmount) {
+	original = RotateZ(original, twistRotation);
 	vec3 result = original;
-	result.x += sin(Time * SWIM_SPEED - original.z + phase) * 0.5;
+	result.x += wiggleAmount;
 	return result;
 }
 
@@ -145,11 +148,13 @@ void main() {
 	
 	mat4 modelMatrix = LookAt(SIZE, InstancePosition, InstanceHeading);
 	mat4 normalMatrix = transpose(inverse(CameraMatrix * modelMatrix));
+	
+	float twistAmount = sin(-VertexPosition.z + phase + Time * SWIM_SPEED - SWIM_ROLL_OFFSET)*0.3;
+	float wiggleAmount = sin(Time * SWIM_SPEED - VertexPosition.z + phase) * 0.2;
+	vec2 twistRotation = vec2(sin(twistAmount), cos(twistAmount));
 
-	// vec3 position = VertexPosition;
-	// vec3 normal = VertexNormal;
-	vec3 position = Swim(VertexPosition, phase);
-	vec3 normal = normalize(Swim(VertexPosition + VertexNormal, phase) - position);
+	vec3 position = Swim(VertexPosition, twistRotation, wiggleAmount);
+	vec3 normal = normalize(Swim(VertexPosition + VertexNormal, twistRotation, wiggleAmount) - position);
 	
 	FragmentUV = VertexUV;
 	FragmentNormal = normalize(mat3(normalMatrix) * normal);
