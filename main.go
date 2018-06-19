@@ -130,8 +130,8 @@ func (boids *Boids) Simulate(world *World) {
 
 	boids.Settings.TargetWeight = 1
 
-	for hash := range boids.CellHash {
-		delete(boids.CellHash, hash)
+	for hash, list := range boids.CellHash {
+		boids.CellHash[hash] = list[:0]
 	}
 
 	bench("---")()
@@ -185,6 +185,10 @@ func (boids *Boids) computeCells(world *World) {
 	defer bench("computeCells")()
 
 	async.Iter(len(boids.CellIndices), *procs, func(cellIndex int) {
+		if len(boids.CellIndices[cellIndex]) == 0 {
+			return
+		}
+
 		indices := boids.CellIndices[cellIndex]
 
 		alignment := g.Vec3{}
