@@ -31,7 +31,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 200000
+	BoidsBatchSize = 100000
 )
 
 type Boids struct {
