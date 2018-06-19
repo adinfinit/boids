@@ -97,7 +97,7 @@ out vec3 FragmentColor;
 
 const float SWIM_SPEED = 4;
 const float SWIM_ROLL_OFFSET = 0.7;
-const float SIZE = 0.2;
+const float SIZE = 0.1;
 
 mat4 LookAt(float size, vec3 pos, vec3 direction) {
 	vec3 up = vec3(0, 1, 0);

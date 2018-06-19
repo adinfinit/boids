@@ -32,7 +32,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 100000
+	BoidsBatchSize = 300000
 	HashThreads    = 2
 )
 
@@ -44,6 +44,7 @@ type Boids struct {
 		SeparationWeight float32
 		AlignmentWeight  float32
 		TargetWeight     float32
+		ObstacleWeight   float32
 	}
 
 	*GPUBoids
@@ -51,11 +52,13 @@ type Boids struct {
 	Speed     [BoidsBatchSize]float32
 	CellIndex [BoidsBatchSize]int32
 
-	Targets []g.Vec3
+	Targets   []g.Vec3
+	Obstacles []g.Vec3
 
 	CellHash       [HashThreads]map[int32][]int32
 	CellIndices    [][]int32
 	CellTarget     []g.Vec3
+	CellObstacle   []g.Vec3
 	CellAlignment  []g.Vec3
 	CellSeparation []g.Vec3
 }
@@ -90,9 +93,11 @@ func (boids *Boids) initData() {
 	boids.Settings.CellRadius = 5
 	boids.Settings.SeparationWeight = 0.5
 	boids.Settings.AlignmentWeight = 1
-	boids.Settings.TargetWeight = 0.5
+	boids.Settings.TargetWeight = 1
+	boids.Settings.ObstacleWeight = 5
 
 	boids.Targets = []g.Vec3{{}, {}, {}}
+	boids.Obstacles = []g.Vec3{{}, {}}
 }
 
 var frame int
@@ -130,7 +135,17 @@ func (boids *Boids) Simulate(world *World) {
 		0,
 	)
 
-	boids.Settings.TargetWeight = 1
+	sn, cs = math.Sincos(float64(world.Time*0.1 + math.Pi))
+	boids.Obstacles[0] = g.V3(
+		float32(-sn)*25,
+		0,
+		float32(cs)*25,
+	)
+	boids.Obstacles[1] = g.V3(
+		float32(sn)*30,
+		float32(-cs)*30,
+		float32(cs)*30,
+	)
 
 	for _, table := range boids.CellHash {
 		for hash, list := range table {
@@ -186,12 +201,14 @@ func (boids *Boids) resizeCells() {
 		boids.CellAlignment = make([]g.Vec3, cellCount)
 		boids.CellSeparation = make([]g.Vec3, cellCount)
 		boids.CellTarget = make([]g.Vec3, cellCount)
+		boids.CellObstacle = make([]g.Vec3, cellCount)
 		boids.CellIndices = make([][]int32, cellCount)
 	}
 
 	boids.CellAlignment = boids.CellAlignment[:cellCount]
 	boids.CellSeparation = boids.CellSeparation[:cellCount]
 	boids.CellTarget = boids.CellTarget[:cellCount]
+	boids.CellObstacle = boids.CellObstacle[:cellCount]
 	boids.CellIndices = boids.CellIndices[:cellCount]
 
 	nextIndex := 0
@@ -199,6 +216,19 @@ func (boids *Boids) resizeCells() {
 		boids.CellIndices[nextIndex] = indices
 		nextIndex++
 	}
+}
+
+func findNearest(center g.Vec3, targets []g.Vec3) g.Vec3 {
+	nearest := targets[0]
+	nearestDist2 := center.Sub(targets[0]).Len2()
+	for _, target := range targets[1:] {
+		dist2 := center.Sub(target).Len2()
+		if dist2 < nearestDist2 {
+			nearest = target
+			nearestDist2 = dist2
+		}
+	}
+	return nearest
 }
 
 func (boids *Boids) computeCells(world *World) {
@@ -225,16 +255,8 @@ func (boids *Boids) computeCells(world *World) {
 		boids.CellAlignment[cellIndex] = alignment.Mul(byCount)
 		boids.CellSeparation[cellIndex] = center
 
-		nearest := boids.Targets[0]
-		nearestDistance2 := center.Sub(boids.Targets[0]).Len2()
-		for _, target := range boids.Targets[1:] {
-			dist2 := center.Sub(target).Len2()
-			if dist2 < nearestDistance2 {
-				nearest = target
-				nearestDistance2 = dist2
-			}
-		}
-		boids.CellTarget[cellIndex] = nearest
+		boids.CellTarget[cellIndex] = findNearest(center, boids.Targets[:])
+		boids.CellObstacle[cellIndex] = findNearest(center, boids.Obstacles[:])
 	})
 }
 
@@ -269,12 +291,20 @@ func (boids *Boids) steerAndMove(world *World) {
 			cellSeparation := boids.CellSeparation[cell]
 			cellAlignment := boids.CellAlignment[cell]
 			cellTarget := boids.CellTarget[cell]
+			cellObstacle := boids.CellObstacle[cell]
 
 			separation := safeNormalize(pos.Sub(cellSeparation), boids.Settings.SeparationWeight)
 			target := safeNormalize(cellTarget.Sub(pos), boids.Settings.TargetWeight)
+
+			obstacleDirection := cellObstacle.Sub(pos)
+			obstacle := g.Z3
+			if obstacleDistance := obstacleDirection.Len2(); obstacleDistance < 5 {
+				weight := boids.Settings.ObstacleWeight // * (5 - obstacleDistance) / 5
+				obstacle = safeNormalize(obstacleDirection, weight)
+			}
 			alignment := safeNormalize(cellAlignment.Sub(head), boids.Settings.AlignmentWeight)
 
-			normalHeading := safeNormalize(alignment.Add(separation).Add(target), 1)
+			normalHeading := safeNormalize(alignment.Add(separation).Add(target).Add(obstacle), 1)
 			newHeading := safeNormalize(head.Add(normalHeading.Sub(head).Mul(dt)), 1)
 			boids.Heading[i] = newHeading
 
