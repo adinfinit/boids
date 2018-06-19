@@ -27,7 +27,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 10000
+	BoidsBatchSize = 50000
 )
 
 type Boids struct {
@@ -41,7 +41,7 @@ type Boids struct {
 		TargetWeight     float32
 	}
 
-	GPUBoids
+	*GPUBoids
 
 	Speed [BoidsBatchSize]float32
 
@@ -76,7 +76,7 @@ func (boids *Boids) randomize() {
 }
 
 func (boids *Boids) initData() {
-	// boids.GPUBoids = &GPUBoids{}
+	boids.GPUBoids = &GPUBoids{}
 	boids.CellHue = make(map[int32]float32, BoidsBatchSize/10)
 	boids.CellHash = make(map[int32][]int32, BoidsBatchSize/10)
 
@@ -207,7 +207,7 @@ func (boids *Boids) moveForward(world *World) {
 func (boids *Boids) Count() int { return BoidsBatchSize }
 
 func (boids *Boids) size() int {
-	return int(unsafe.Sizeof(boids.GPUBoids))
+	return int(unsafe.Sizeof(*boids.GPUBoids))
 }
 func (boids *Boids) Init(program uint32) {
 	boids.initData()
@@ -215,7 +215,7 @@ func (boids *Boids) Init(program uint32) {
 
 	gl.GenBuffers(1, &boids.VBO)
 	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
-	gl.BufferData(gl.ARRAY_BUFFER, boids.size(), unsafe.Pointer(&boids.GPUBoids), gl.DYNAMIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, boids.size(), unsafe.Pointer(boids.GPUBoids), gl.DYNAMIC_DRAW)
 
 	boids.attribVec3(program, "InstancePosition", unsafe.Offsetof(boids.GPUBoids.Position))
 	boids.attribVec3(program, "InstanceHeading", unsafe.Offsetof(boids.GPUBoids.Heading))
@@ -245,7 +245,7 @@ func (boids *Boids) attribFloat(program uint32, name string, offset uintptr) {
 
 func (boids *Boids) Upload() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, boids.VBO)
-	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.size(), unsafe.Pointer(&boids.GPUBoids))
+	gl.BufferSubData(gl.ARRAY_BUFFER, 0, boids.size(), unsafe.Pointer(boids.GPUBoids))
 }
 
 const Mat4Size = 16 * 4
