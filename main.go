@@ -275,7 +275,7 @@ func main() {
 	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.Resizable, glfw.True)
-	glfw.WindowHint(glfw.Samples, 2)
+	glfw.WindowHint(glfw.Samples, 0)
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 4)
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
@@ -400,6 +400,7 @@ func main() {
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
 			int32(boids.Count()),
 		)
+		// gl.Finish()
 
 		renderStop := hrtime.Now()
 
