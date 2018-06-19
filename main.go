@@ -340,6 +340,7 @@ func main() {
 	timeUniform := gl.GetUniformLocation(boidProgram, gl.Str("Time\x00"))
 	projectionUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionMatrix\x00"))
 	cameraUniform := gl.GetUniformLocation(boidProgram, gl.Str("CameraMatrix\x00"))
+	projectionCameraUniform := gl.GetUniformLocation(boidProgram, gl.Str("ProjectionCameraMatrix\x00"))
 	textureUniform := gl.GetUniformLocation(boidProgram, gl.Str("AlbedoTexture\x00"))
 	gl.Uniform1i(textureUniform, 0)
 
@@ -402,7 +403,6 @@ func main() {
 		sn, cs := g.Sincos(angle)
 		world.Camera.Eye.X = sn * 30.0
 		world.Camera.Eye.Z = cs * 30.0
-
 		world.DiffuseLightPosition = g.Z3
 
 		world.NextFrameGLFW(window)
@@ -421,6 +421,7 @@ func main() {
 		gl.Uniform1f(timeUniform, float32(world.Time))
 		gl.UniformMatrix4fv(projectionUniform, 1, false, world.Camera.Projection.Ptr())
 		gl.UniformMatrix4fv(cameraUniform, 1, false, world.Camera.Camera.Ptr())
+		gl.UniformMatrix4fv(projectionCameraUniform, 1, false, world.Camera.ProjectionCamera.Ptr())
 		gl.Uniform3fv(diffuseLightPositionUniform, 1, world.DiffuseLightPosition.Ptr())
 
 		gl.BindVertexArray(meshVAO)
@@ -432,11 +433,11 @@ func main() {
 			gl.TRIANGLES, int32(len(mesh.Indices)), gl.UNSIGNED_SHORT, gl.PtrOffset(0),
 			int32(boids.Count()),
 		)
-		// gl.Finish()
+		gl.Finish()
 
 		renderStop := hrtime.Now()
 
-		window.SetTitle(fmt.Sprintf("Sim:\t%v\tRender:\t%v", simStop-simStart, renderStop-renderStart))
+		window.SetTitle(fmt.Sprintf("Sim:%v    Render:%v", simStop-simStart, renderStop-renderStart))
 
 		// Maintenance
 		window.SwapBuffers()
@@ -489,8 +490,9 @@ type Camera struct {
 	FOV       float32
 	Near, Far float32
 
-	Projection g.Mat4
-	Camera     g.Mat4
+	Projection       g.Mat4
+	Camera           g.Mat4
+	ProjectionCamera g.Mat4
 }
 
 func NewCamera() *Camera {
@@ -505,4 +507,6 @@ func NewCamera() *Camera {
 func (camera *Camera) UpdateScreenSize(size g.Vec2) {
 	camera.Projection = g.Perspective(g.DegToRad(camera.FOV), size.X/size.Y, 0.1, 100.0)
 	camera.Camera = g.LookAtV(camera.Eye, camera.LookAt, camera.Up)
+
+	camera.ProjectionCamera = camera.Projection.Mul4(camera.Camera)
 }
