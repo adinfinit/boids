@@ -3,8 +3,8 @@
 package main
 
 import (
+	"github.com/adinfinit/g"
 	"github.com/go-gl/gl/v4.1-core/gl"
-	m "github.com/go-gl/mathgl/mgl32"
 )
 
 type Shader struct {
@@ -38,18 +38,18 @@ func (shader *Shader) UniformFloat32(name string, v float32) {
 	gl.Uniform1f(location, v)
 }
 
-func (shader *Shader) UniformVec3(name string, v m.Vec3) {
+func (shader *Shader) UniformVec3(name string, v g.Vec3) {
 	location := shader.uniformLocation(name)
 	if location == 0 {
 		return
 	}
-	gl.Uniform3f(location, v.X(), v.Y(), v.Z())
+	gl.Uniform3f(location, v.X, v.Y, v.Z)
 }
 
-func (shader *Shader) UniformMatrix(name string, v m.Mat4) {
+func (shader *Shader) UniformMatrix(name string, v g.Mat4) {
 	location := shader.uniformLocation(name)
 	if location == 0 {
 		return
 	}
-	gl.UniformMatrix4fv(location, 1, false, &v[0])
+	gl.UniformMatrix4fv(location, 1, false, v.Ptr())
 }

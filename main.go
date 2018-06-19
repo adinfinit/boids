@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"unsafe"
 
+	"github.com/adinfinit/g"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
-	m "github.com/go-gl/mathgl/mgl32"
 )
 
 var (
@@ -32,40 +32,40 @@ type Boids struct {
 		CellRadius       float32
 		SeparationWeight float32
 		AlignmentWeight  float32
-		Target           m.Vec3
+		Target           g.Vec3
 		TargetWeight     float32
 	}
 
 	GPUBoids
 
 	Speed [BoidsBatchSize]float32
-	Color [BoidsBatchSize]m.Vec3
+	Color [BoidsBatchSize]g.Vec3
 
 	CellHash       map[int32][]int32
 	CellIndex      [BoidsBatchSize]int32
-	CellAlignment  []m.Vec3
-	CellSeparation []m.Vec3
+	CellAlignment  []g.Vec3
+	CellSeparation []g.Vec3
 	CellCount      []int32
 }
 
 type GPUBoids struct {
-	Position [BoidsBatchSize]m.Vec3
-	Heading  [BoidsBatchSize]m.Vec3
-	// Matrix  [BoidsBatchSize]m.Mat4
+	Position [BoidsBatchSize]g.Vec3
+	Heading  [BoidsBatchSize]g.Vec3
+	// Matrix  [BoidsBatchSize]g.Mat4
 }
 
 func (boids *Boids) randomize() {
 	for i := range boids.Position {
-		boids.Position[i] = m.Vec3{
-			rand.Float32()*40 - 20,
-			rand.Float32()*40 - 20,
-			rand.Float32()*40 - 20,
-		}
-		boids.Heading[i] = (m.Vec3{
-			rand.Float32() - 0.5,
-			rand.Float32() - 0.5,
-			rand.Float32() - 0.5,
-		}).Normalize()
+		boids.Position[i] = g.V3(
+			rand.Float32()*40-20,
+			rand.Float32()*40-20,
+			rand.Float32()*40-20,
+		)
+		boids.Heading[i] = g.V3(
+			rand.Float32()-0.5,
+			rand.Float32()-0.5,
+			rand.Float32()-0.5,
+		).Normalize()
 		boids.Speed[i] = 5
 	}
 }
@@ -77,17 +77,17 @@ func (boids *Boids) initData() {
 	boids.Settings.CellRadius = 5
 	boids.Settings.SeparationWeight = 0.5
 	boids.Settings.AlignmentWeight = 0.5
-	boids.Settings.Target = m.Vec3{}
+	boids.Settings.Target = g.Vec3{}
 	boids.Settings.TargetWeight = 0.5
 }
 
 func (boids *Boids) Simulate(world *World) {
 	sn, cs := math.Sincos(float64(world.Time))
-	boids.Settings.Target = m.Vec3{
-		float32(sn) * 10,
+	boids.Settings.Target = g.V3(
+		float32(sn)*10,
 		0,
-		float32(cs) * 10,
-	}
+		float32(cs)*10,
+	)
 	boids.Settings.TargetWeight = float32(math.Sin(world.Time*0.5)*0.3 + 0.3)
 
 	for hash := range boids.CellHash {
@@ -104,7 +104,7 @@ func (boids *Boids) Simulate(world *World) {
 func (boids *Boids) hashPositions(radius float32) {
 	for i, pos := range boids.Position {
 		p := pos.Mul(1 / radius)
-		x, y, z := int32(p[0]), int32(p[1]), int32(p[2])
+		x, y, z := int32(p.X), int32(p.Y), int32(p.Z)
 
 		hash := x
 		hash += (hash * 397) ^ y
@@ -119,8 +119,8 @@ func (boids *Boids) hashPositions(radius float32) {
 
 func (boids *Boids) resizeCells() {
 	if cap(boids.CellAlignment) < len(boids.CellHash) {
-		boids.CellAlignment = make([]m.Vec3, len(boids.CellHash))
-		boids.CellSeparation = make([]m.Vec3, len(boids.CellHash))
+		boids.CellAlignment = make([]g.Vec3, len(boids.CellHash))
+		boids.CellSeparation = make([]g.Vec3, len(boids.CellHash))
 		boids.CellCount = make([]int32, len(boids.CellHash))
 	}
 
@@ -132,8 +132,8 @@ func (boids *Boids) resizeCells() {
 func (boids *Boids) computeCells(world *World) {
 	cellIndex := int32(0)
 	for _, indices := range boids.CellHash {
-		alignment := m.Vec3{}
-		separation := m.Vec3{}
+		alignment := g.Vec3{}
+		separation := g.Vec3{}
 
 		for _, boidIndex := range indices {
 			boids.CellIndex[boidIndex] = cellIndex
@@ -148,20 +148,20 @@ func (boids *Boids) computeCells(world *World) {
 	}
 }
 
-func check(t string, ps ...m.Vec3) {
+func check(t string, ps ...g.Vec3) {
 	for i, p := range ps {
-		if math.IsNaN(float64(p[0])) || math.IsNaN(float64(p[1])) || math.IsNaN(float64(p[2])) {
+		if math.IsNaN(float64(p.X)) || math.IsNaN(float64(p.Y)) || math.IsNaN(float64(p.Z)) {
 			fmt.Println(ps)
 			panic(t + "=" + strconv.Itoa(i))
 		}
 	}
 }
 
-func safeNormalize(v m.Vec3, s float32) m.Vec3 {
+func safeNormalize(v g.Vec3, s float32) g.Vec3 {
 	l := v.Len()
 	if l < 1e-3 {
-		return m.Vec3{0, 0, s}
-		//return (m.Vec3{rand.Float32() - 0.5, rand.Float32() - 0.5, rand.Float32() - 0.5}).Normalize()
+		return g.V3(0, 0, s)
+		//return (g.Vec3{rand.Float32() - 0.5, rand.Float32() - 0.5, rand.Float32() - 0.5}).Normalize()
 	}
 	return v.Mul(s / l)
 }
@@ -321,10 +321,10 @@ func main() {
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		angle += world.DeltaTime * 0
-		sn, cs := math.Sincos(float64(angle))
-		world.Camera.Eye[0] = float32(sn) * 30.0
-		world.Camera.Eye[2] = float32(cs) * 30.0
+		angle += world.DeltaTime * 0.1
+		sn, cs := g.Sincos(angle)
+		world.Camera.Eye.X = sn * 30.0
+		world.Camera.Eye.Z = cs * 30.0
 
 		world.DiffuseLightPosition = boids.Settings.Target
 
@@ -337,9 +337,9 @@ func main() {
 		gl.UseProgram(program)
 
 		gl.Uniform1f(timeUniform, float32(world.Time))
-		gl.UniformMatrix4fv(projectionUniform, 1, false, &world.Camera.Projection[0])
-		gl.UniformMatrix4fv(cameraUniform, 1, false, &world.Camera.Camera[0])
-		gl.Uniform3fv(diffuseLightPositionUniform, 1, &world.DiffuseLightPosition[0])
+		gl.UniformMatrix4fv(projectionUniform, 1, false, world.Camera.Projection.Ptr())
+		gl.UniformMatrix4fv(cameraUniform, 1, false, world.Camera.Camera.Ptr())
+		gl.Uniform3fv(diffuseLightPositionUniform, 1, world.DiffuseLightPosition.Ptr())
 
 		boids.Upload()
 
@@ -360,10 +360,10 @@ func main() {
 }
 
 type World struct {
-	ScreenSize m.Vec2
+	ScreenSize g.Vec2
 	Camera     Camera
 
-	DiffuseLightPosition m.Vec3
+	DiffuseLightPosition g.Vec3
 
 	Time      float64
 	DeltaTime float32
@@ -378,7 +378,7 @@ func NewWorld() *World {
 
 func (world *World) NextFrameGLFW(window *glfw.Window) {
 	width, height := window.GetFramebufferSize()
-	screenSize := m.Vec2{float32(width), float32(height)}
+	screenSize := g.V2(float32(width), float32(height))
 	now := glfw.GetTime()
 
 	if world.ScreenSize != screenSize {
@@ -387,9 +387,9 @@ func (world *World) NextFrameGLFW(window *glfw.Window) {
 	world.NextFrame(screenSize, now)
 }
 
-func (world *World) NextFrame(screenSize m.Vec2, now float64) {
+func (world *World) NextFrame(screenSize g.Vec2, now float64) {
 	if world.ScreenSize != screenSize {
-		log.Println(screenSize, screenSize.X()/screenSize.Y())
+		log.Println(screenSize, screenSize.X/screenSize.Y)
 	}
 	world.ScreenSize = screenSize
 	world.DeltaTime = float32(now - world.Time)
@@ -399,25 +399,25 @@ func (world *World) NextFrame(screenSize m.Vec2, now float64) {
 }
 
 type Camera struct {
-	Eye, LookAt, Up m.Vec3
+	Eye, LookAt, Up g.Vec3
 
 	FOV       float32
 	Near, Far float32
 
-	Projection m.Mat4
-	Camera     m.Mat4
+	Projection g.Mat4
+	Camera     g.Mat4
 }
 
 func NewCamera() *Camera {
 	return &Camera{
-		Eye:    m.Vec3{30, 30, 30},
-		LookAt: m.Vec3{0, 0, 0},
-		Up:     m.Vec3{0, 1, 0},
+		Eye:    g.V3(30, 30, 30),
+		LookAt: g.V3(0, 0, 0),
+		Up:     g.V3(0, 1, 0),
 		FOV:    70,
 	}
 }
 
-func (camera *Camera) UpdateScreenSize(size m.Vec2) {
-	camera.Projection = m.Perspective(m.DegToRad(camera.FOV), size.X()/size.Y(), 0.1, 100.0)
-	camera.Camera = m.LookAtV(camera.Eye, camera.LookAt, camera.Up)
+func (camera *Camera) UpdateScreenSize(size g.Vec2) {
+	camera.Projection = g.Perspective(g.DegToRad(camera.FOV), size.X/size.Y, 0.1, 100.0)
+	camera.Camera = g.LookAtV(camera.Eye, camera.LookAt, camera.Up)
 }

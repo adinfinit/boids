@@ -3,8 +3,8 @@
 package main
 
 import (
+	"github.com/adinfinit/g"
 	"github.com/go-gl/gl/v4.1-core/gl"
-	m "github.com/go-gl/mathgl/mgl32"
 )
 
 type Program struct {
@@ -28,7 +28,7 @@ type Mesh struct {
 }
 
 type Vertex struct {
-	Position m.Vec3
+	Position g.Vec3
 }
 
 func (mesh *Mesh) Upload() error {
