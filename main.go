@@ -32,7 +32,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 100000
+	BoidsBatchSize = 50000
 	HashThreads    = 2
 )
 
@@ -77,7 +77,7 @@ func (boids *Boids) randomize() {
 			rand.Float32()-0.5,
 			rand.Float32()-0.5,
 		).Normalize()
-		boids.Speed[i] = 3 + rand.Float32()*3
+		boids.Speed[i] = 5 + rand.Float32()*3
 	}
 }
 
@@ -129,6 +129,7 @@ func (boids *Boids) Simulate(world *World) {
 		float32(sn)*30,
 		0,
 	)
+	boids.Settings.CellRadius = 5 + 2*g.Sin(float32(world.Time))
 
 	boids.Settings.TargetWeight = 1
 
