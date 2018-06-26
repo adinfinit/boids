@@ -97,7 +97,7 @@ out vec3 FragmentColor;
 
 const float SWIM_SPEED = 4;
 const float SWIM_ROLL_OFFSET = 0.7;
-const float SIZE = 0.2;
+const float SIZE = 0.5;
 
 mat4 LookAt(float size, vec3 pos, vec3 direction) {
 	vec3 up = vec3(0, 1, 0);
@@ -170,8 +170,9 @@ void main() {
 	gl_Position = ProjectionViewMatrix * fragmentPosition;
 
 	// lighting
-	float hue = mod(gl_InstanceID * 0.011111, 1);
-	vec3 albedo = vec3(hue);
+	float hue = mod(gl_InstanceID * 0.011111 + Time * 0.25142, 1);
+	float light = mod(gl_InstanceID * 0.035124 + Time * 0.1531, 0.75) + 0.25;
+	vec3 albedo = hsv2rgb(vec3(hue, 0.7, light));
 	float ambientLight = 0.3;
 	
 	vec3 screenNormal = normalize(mat3(normalMatrix) * normal);
