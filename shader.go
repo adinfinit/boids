@@ -170,8 +170,8 @@ void main() {
 	gl_Position = ProjectionViewMatrix * fragmentPosition;
 
 	// lighting
-	float hue = mod(gl_InstanceID * 0.011111 + Time * 0.25142, 1);
-	float light = mod(gl_InstanceID * 0.035124 + Time * 0.1531, 0.75) + 0.25;
+	float hue = mod(gl_InstanceID * 0.011111 + Time * 2, 1);
+	float light = mod(gl_InstanceID * 0.035124 + Time * 0.5, 0.75) + 0.25;
 	vec3 albedo = hsv2rgb(vec3(hue, 0.7, light));
 	float ambientLight = 0.3;
 	
