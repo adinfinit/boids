@@ -170,9 +170,11 @@ void main() {
 	gl_Position = ProjectionViewMatrix * fragmentPosition;
 
 	// lighting
-	float hue = mod(gl_InstanceID * 0.011111 + Time * 2, 1);
+	//float hue = mod(gl_InstanceID * 0.011111 + Time * 2, 1);
+	float hue = mod(gl_InstanceID * 0.001 * sin(Time), 1);
+	if(hue < 0) hue = -hue;
 	float light = mod(gl_InstanceID * 0.035124 + Time * 0.5, 0.75) + 0.25;
-	vec3 albedo = hsv2rgb(vec3(hue, 0.7, light));
+	vec3 albedo = hsv2rgb(vec3(hue, 0.7, 0.7));
 	float ambientLight = 0.3;
 	
 	vec3 screenNormal = normalize(mat3(normalMatrix) * normal);
