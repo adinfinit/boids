@@ -1,0 +1,15 @@
+github.com/adinfinit/g v0.0.0-20180619162046-6ceba9489be2 h1:J9nOIfq8bZmvjX481EQ38hXILRwlmQBHeF3htQU08Vs=
+github.com/adinfinit/g v0.0.0-20180619162046-6ceba9489be2/go.mod h1:xeL1NT0t47xAXymDKshz6kktDgPOBfQNfTbBSyz0GQs=
+github.com/egonelbre/async v0.0.0-20180428125808-52e5b9c6d8ca h1:itwMF54ep0rjYe4GtkjCQVfV3imgEOKfGBECeLC6kvk=
+github.com/egonelbre/async v0.0.0-20180428125808-52e5b9c6d8ca/go.mod h1:rl9mUiifNmlmfTguAMdyZnEBjDQngNWsxaMT4TTx7s8=
+github.com/go-gl/gl v0.0.0-20210315015930-ae072cafe09d h1:o81yRlBATU4PRn97lydmsq8hTRNXI4wlR/VvUQhFRVY=
+github.com/go-gl/gl v0.0.0-20210315015930-ae072cafe09d/go.mod h1:482civXOzJJCPzJ4ZOX/pwvXBWSnzD4OKMdH4ClKGbk=
+github.com/go-gl/glfw v0.0.0-20210410170116-ea3d685f79fb h1:yMlfD+jmoG8wwBVLaFwtcgNBY207iWsYwtNC9u+T2yk=
+github.com/go-gl/glfw v0.0.0-20210410170116-ea3d685f79fb/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
+github.com/go-gl/mathgl v1.0.0 h1:t9DznWJlXxxjeeKLIdovCOVJQk/GzDEL7h/h+Ro2B68=
+github.com/go-gl/mathgl v1.0.0/go.mod h1:yhpkQzEiH9yPyxDUGzkmgScbaBVlhC06qodikEM0ZwQ=
+github.com/loov/hrtime v1.0.3 h1:LiWKU3B9skJwRPUf0Urs9+0+OE3TxdMuiRPOTwR0gcU=
+github.com/loov/hrtime v1.0.3/go.mod h1:yDY3Pwv2izeY4sq7YcPX/dtLwzg5NU1AxWuWxKwd0p0=
+golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f h1:FO4MZ3N56GnxbqxGKqh+YTzUWQ2sDwtFQEZgLOxh9Jc=
+golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=

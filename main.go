@@ -32,7 +32,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 1000
+	BoidsBatchSize = 50000
 	HashThreads    = 2
 )
 
