@@ -32,7 +32,7 @@ var (
 )
 
 const (
-	BoidsBatchSize = 50000
+	BoidsBatchSize = 1000000
 	HashThreads    = 2
 )
 
@@ -139,7 +139,7 @@ func (boids *Boids) Simulate(world *World) {
 		}
 	}
 
-	bench("---")()
+	defer bench("---")()
 	boids.hashPositions(boids.Settings.CellRadius)
 	boids.resizeCells()
 	boids.computeCells(world)
