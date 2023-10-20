@@ -98,11 +98,11 @@ func (boids *Boids) initData() {
 var frame int
 
 func bench(name string) func() {
-	start := hrtime.TSC()
+	start := hrtime.Now()
 	return func() {
-		stop := hrtime.TSC()
+		stop := hrtime.Now()
 		if frame%100 == 0 {
-			fmt.Printf("%-15s: %v\n", name, (stop - start).ApproxDuration())
+			fmt.Printf("%-15s: %v\n", name, stop-start)
 		}
 	}
 }
